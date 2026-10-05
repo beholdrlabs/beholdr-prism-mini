@@ -1121,18 +1121,19 @@ git commit -m "Rewrite skill for config-driven routing and input compression (2.
 **Files:**
 - No repo changes unless a check finds a defect (then fix in the owning file, add a test if it is script behaviour, and commit).
 
-- [ ] **Step 1: Ask the user before replacing the installed copy**
+- [ ] **Step 1: Remove the installed 1.x copy and link the repo for development**
 
-Confirm, then run:
+The user approved deleting 1.x (it was installed with `bunx skills add .`, which copies into `~/.agents/skills` and symlinks agent directories to that copy; it has no lock-file entry). 1.x stays recoverable from commit `d0b65ac`.
 
 ```bash
-mkdir -p ~/.beholdr/backup
-mv ~/.agents/skills/beholdr-prism-mini ~/.beholdr/backup/beholdr-prism-mini-1.x
+(cd /tmp && bunx skills remove beholdr-prism-mini -g -y)
 ln -s /home/can/dev/beholdr-prism-mini ~/.agents/skills/beholdr-prism-mini
+ln -sfn ../../.agents/skills/beholdr-prism-mini ~/.claude/skills/beholdr-prism-mini
 ls -la ~/.agents/skills/beholdr-prism-mini ~/.claude/skills/beholdr-prism-mini
+readlink -f ~/.claude/skills/beholdr-prism-mini
 ```
 
-Expected: both resolve to the repo. The backup sits outside any skills directory so no harness loads it twice.
+Expected: `readlink -f` prints `/home/can/dev/beholdr-prism-mini`. If `skills remove` leaves the copy in place, delete `~/.agents/skills/beholdr-prism-mini` after checking it holds only the 1.x files (`README.md`, `SKILL.md`, `docs/`, `references/`). Do not use `bunx skills add .` while developing: it copies, so edits would not reach the harnesses. Reinstall that way only when publishing.
 
 - [ ] **Step 2: Init dry run in a scratch git repo**
 
