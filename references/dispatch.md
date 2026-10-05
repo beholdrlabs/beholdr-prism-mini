@@ -15,7 +15,7 @@ Use the first candidate in the role whose `via` can run in the current environme
 ## `omp`
 
 - **Inside omp:** use a task agent with the model set, or the `smol` (fast) / `slow` (reasoning) roles when they already point at the candidate. Per-agent model overrides live in omp's `task.agentModelOverrides` setting; do not change user settings without asking.
-- **From another harness:** `omp -p --no-session --model <model> --thinking <effort> "<prompt>"`. omp calls effort `none` `off`.
+- **From another harness:** `omp -p --no-session --model <model> --thinking <effort> "<prompt>"`. omp calls effort `none` `off`. A model without tool support fails with "does not support tools"; skip it for gathering, or pass `--no-tools` only for pure text work.
 - OpenRouter models (`openrouter/<vendor>/<model>`) need `OPENROUTER_API_KEY` in the environment. Check that the variable is set; never print its value. If it is missing, skip the candidate and say why.
 
 ## `herdr:<kind>`
