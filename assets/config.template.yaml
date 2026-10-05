@@ -2,6 +2,7 @@
 # beholdr-prism-mini routing config. Candidates are tried in order; the first
 # one whose `via` can run here is used. See references/choosing-models.md in the skill.
 # Never put API keys or tokens in this file.
+# In a project file, delete a role's key to inherit it from ~/.beholdr/prism-mini.config.yaml.
 version: 1
 
 roles:

@@ -79,6 +79,8 @@ def load_file(path: Path) -> dict:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         raise ConfigError(EXIT_INVALID, f"{path}: not valid YAML: {exc}") from None
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConfigError(EXIT_INVALID, f"{path}: cannot read: {exc}") from None
     if not isinstance(data, dict):
         raise ConfigError(EXIT_INVALID, f"{path}: expected a mapping with a 'version' key")
     return data
@@ -112,11 +114,17 @@ def _json_path(parts) -> str:
     return "$" + "".join(f"[{p}]" if isinstance(p, int) else f".{p}" for p in parts)
 
 
+def _hint(error) -> str:
+    if error.validator == "minItems" and list(error.absolute_path)[:1] == ["roles"]:
+        return " (add a candidate, or remove the key to inherit this role from the user config)"
+    return ""
+
+
 def validate(data: dict, path: Path) -> None:
     validator = Draft202012Validator(load_schema(SUPPORTED_VERSION))
     errors = sorted(validator.iter_errors(data), key=lambda e: [str(p) for p in e.absolute_path])
     if errors:
-        lines = "\n".join(f"  {_json_path(e.absolute_path)}: {e.message}" for e in errors)
+        lines = "\n".join(f"  {_json_path(e.absolute_path)}: {e.message}{_hint(e)}" for e in errors)
         raise ConfigError(EXIT_INVALID, f"{path}: does not match config schema v{SUPPORTED_VERSION}:\n{lines}")
 
 
@@ -173,6 +181,8 @@ def cmd_check(cwd: Path, home: Path, as_json: bool) -> int:
 
 def cmd_init(cwd: Path, home: Path, scope: str, force: bool) -> int:
     target = user_config_path(home) if scope == "user" else project_target(cwd)
+    if scope == "project" and target == user_config_path(home):
+        raise ConfigError(EXIT_USAGE, f"{cwd} is not inside a project; run from a project directory, or use --user")
     if target.exists() and not force:
         raise ConfigError(EXIT_USAGE, f"{target} already exists; edit it, or pass --force to replace it")
     template = (ASSETS / "config.template.yaml").read_text(encoding="utf-8")

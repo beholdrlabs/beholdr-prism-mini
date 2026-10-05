@@ -23,9 +23,10 @@ From the project's working directory, run this skill's script (path relative to 
 | --- | --- | --- |
 | 0 | Resolved config on stdout | Route with it. |
 | 2 | No config | Offer to set one up (section 7). Until then, do not pick models for subagents; ask the user. |
-| 3 | Invalid config | Show the errors and offer to fix the file. |
+| 1 | Usage error (bad arguments, file already exists, not inside a project) | Read the message and correct the command. |
+| 3 | Invalid or unreadable config | Show the errors and offer to fix the file. Do not route until `check` exits 0. |
 | 4 | Older config version | Show `migrate` output, then run `migrate --write` with the user's approval. |
-| 5 | Config newer than skill | Tell the user to update the skill. |
+| 5 | Config newer than skill | Tell the user to update the skill. Do not route until then. |
 
 If `uv` is missing or the script cannot run, say so and ask how to proceed. Do not fall back to model names you remember.
 
@@ -57,7 +58,7 @@ If no candidate in a role can run, say which candidates were skipped and why, th
 
 ## 7. Set up or change the config
 
-1. Ask whether the config is for this project or for the user, then run `prism.py init --project` or `init --user`. Project settings replace the user's per role.
+1. Ask whether the config is for this project or for the user, then run `prism.py init --project` or `init --user`. Project settings replace the user's per role; delete a role's key from the project file to inherit it.
 2. Find what can run: installed `claude`, `codex`, `omp`, `herdr`; their model lists (`omp models` includes OpenRouter); which provider key variables are set. Check presence only; never print or store key values.
 3. Propose two or three candidates per role using [choosing models](references/choosing-models.md).
 4. Show the YAML. Add paid or opt-in routes only with the user's approval.

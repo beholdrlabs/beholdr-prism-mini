@@ -264,3 +264,43 @@ def test_migrate_dry_run_then_write(env, capsys, v2):
     backup = target.with_name(target.name + ".v1.bak")
     assert backup.read_text(encoding="utf-8") == original
     assert run(["check"], home, repo, capsys)[0] == 0
+
+
+def test_non_utf8_config_exits_3_without_traceback(env, capsys):
+    home, repo = env
+    path = project_cfg(repo)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"version: 1\nroles: \xff\n")
+    code, _, err = run(["check"], home, repo, capsys)
+    assert code == prism.EXIT_INVALID
+    assert str(path) in err
+
+
+def test_unreadable_config_exits_3(env, capsys):
+    home, repo = env
+    path = write(project_cfg(repo), full())
+    path.chmod(0)
+    try:
+        code, _, err = run(["check"], home, repo, capsys)
+    finally:
+        path.chmod(0o644)
+    assert code == prism.EXIT_INVALID
+    assert str(path) in err
+
+
+def test_empty_role_error_explains_inheritance(env, capsys):
+    home, repo = env
+    write(user_cfg(home), full())
+    write(project_cfg(repo), {"version": 1, "roles": {"fast": [], "reasoning": REASONING}})
+    code, _, err = run(["check"], home, repo, capsys)
+    assert code == prism.EXIT_INVALID
+    assert "remove the key to inherit" in err
+
+
+def test_init_project_outside_project_refuses_to_touch_user_file(env, capsys):
+    home, _ = env
+    user = write(user_cfg(home), full())
+    code, _, err = run(["init", "--project", "--force"], home, home, capsys)
+    assert code == prism.EXIT_USAGE
+    assert "--user" in err
+    assert yaml.safe_load(user.read_text(encoding="utf-8")) == full()
