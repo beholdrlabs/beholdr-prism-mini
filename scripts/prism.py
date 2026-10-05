@@ -171,6 +171,39 @@ def cmd_check(cwd: Path, home: Path, as_json: bool) -> int:
     return EXIT_OK
 
 
+def cmd_init(cwd: Path, home: Path, scope: str, force: bool) -> int:
+    target = user_config_path(home) if scope == "user" else project_target(cwd)
+    if target.exists() and not force:
+        raise ConfigError(EXIT_USAGE, f"{target} already exists; edit it, or pass --force to replace it")
+    template = (ASSETS / "config.template.yaml").read_text(encoding="utf-8")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(template.replace("{{SCHEMA_PATH}}", str(schema_path(SUPPORTED_VERSION))), encoding="utf-8")
+    print(target)
+    return EXIT_OK
+
+
+def cmd_migrate(cwd: Path, home: Path, scope: str, write: bool) -> int:
+    path = user_config_path(home) if scope == "user" else project_config_path(cwd, home)
+    if path is None or not path.is_file():
+        raise ConfigError(EXIT_NO_CONFIG, f"no {scope} config found; nothing to migrate")
+    data = load_file(path)
+    old = file_version(data, path)
+    if old == SUPPORTED_VERSION:
+        print(f"{path}: already at version {SUPPORTED_VERSION}")
+        return EXIT_OK
+    migrated = upgrade(data, path)
+    validate(migrated, path)
+    text = f"{SCHEMA_HEADER}{schema_path(SUPPORTED_VERSION)}\n{yaml.safe_dump(migrated, sort_keys=False)}"
+    if not write:
+        print(text, end="")
+        return EXIT_OK
+    backup = path.with_name(f"{path.name}.v{old}.bak")
+    shutil.copy2(path, backup)
+    path.write_text(text, encoding="utf-8")
+    print(f"migrated {path} to version {SUPPORTED_VERSION}; previous file saved as {backup}")
+    return EXIT_OK
+
+
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         self.print_usage(sys.stderr)
@@ -183,6 +216,15 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="validate and print the resolved config")
     check.add_argument("--json", action="store_true", help="print JSON instead of YAML")
+    init = sub.add_parser("init", help="write a config scaffold")
+    init.add_argument("--force", action="store_true", help="replace an existing file")
+    migrate = sub.add_parser("migrate", help="upgrade a config to the supported version")
+    migrate.add_argument("--write", action="store_true", help="write the result (default: print it)")
+    for command in (init, migrate):
+        scope = command.add_mutually_exclusive_group()
+        scope.add_argument("--project", dest="scope", action="store_const", const="project")
+        scope.add_argument("--user", dest="scope", action="store_const", const="user")
+        command.set_defaults(scope="project")
     return parser
 
 
@@ -193,6 +235,10 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None, home: Path |
     try:
         if args.command == "check":
             return cmd_check(cwd, home, args.json)
+        if args.command == "init":
+            return cmd_init(cwd, home, args.scope, args.force)
+        if args.command == "migrate":
+            return cmd_migrate(cwd, home, args.scope, args.write)
     except ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return exc.code

@@ -192,3 +192,75 @@ def test_usage_error_exits_1(env, capsys):
     with pytest.raises(SystemExit) as exc:
         prism.main(["bogus"], cwd=repo, home=home)
     assert exc.value.code == prism.EXIT_USAGE
+
+
+def test_init_project_writes_at_git_root_with_schema_path(env, capsys):
+    home, repo = env
+    sub = repo / "pkg"
+    sub.mkdir()
+    code, out, _ = run(["init"], home, sub, capsys)
+    assert code == 0
+    target = project_cfg(repo)
+    assert out.strip() == str(target)
+    header = target.read_text(encoding="utf-8").splitlines()[0]
+    schema = Path(header.removeprefix(prism.SCHEMA_HEADER))
+    assert schema.is_absolute() and schema.is_file()
+
+
+def test_fresh_scaffold_fails_check_until_filled(env, capsys):
+    home, repo = env
+    run(["init"], home, repo, capsys)
+    code, _, err = run(["check"], home, repo, capsys)
+    assert code == prism.EXIT_INVALID
+    assert "$.roles.fast" in err
+
+
+def test_init_refuses_overwrite_without_force(env, capsys):
+    home, repo = env
+    target = write(project_cfg(repo), full())
+    code, _, err = run(["init"], home, repo, capsys)
+    assert code == prism.EXIT_USAGE
+    assert "--force" in err
+    assert yaml.safe_load(target.read_text(encoding="utf-8")) == full()
+    code, _, _ = run(["init", "--force"], home, repo, capsys)
+    assert code == 0
+    assert yaml.safe_load(target.read_text(encoding="utf-8"))["roles"]["fast"] == []
+
+
+def test_init_user(env, capsys):
+    home, repo = env
+    code, out, _ = run(["init", "--user"], home, repo, capsys)
+    assert code == 0
+    assert out.strip() == str(user_cfg(home))
+
+
+def test_migrate_current_is_noop(env, capsys):
+    home, repo = env
+    write(project_cfg(repo), full())
+    code, out, _ = run(["migrate"], home, repo, capsys)
+    assert code == 0
+    assert "already at version 1" in out
+
+
+def test_migrate_missing_config_exits_2(env, capsys):
+    home, repo = env
+    code, _, _ = run(["migrate", "--user"], home, repo, capsys)
+    assert code == prism.EXIT_NO_CONFIG
+
+
+def test_migrate_dry_run_then_write(env, capsys, v2):
+    home, repo = env
+    target = write(project_cfg(repo), full())
+    original = target.read_text(encoding="utf-8")
+
+    code, out, _ = run(["migrate"], home, repo, capsys)
+    assert code == 0
+    assert out.startswith(prism.SCHEMA_HEADER)
+    assert yaml.safe_load(out)["version"] == 2
+    assert target.read_text(encoding="utf-8") == original
+
+    code, out, _ = run(["migrate", "--write"], home, repo, capsys)
+    assert code == 0
+    backup = target.with_name(target.name + ".v1.bak")
+    assert backup.read_text(encoding="utf-8") == original
+    assert run(["check"], home, repo, capsys)[0] == 0
