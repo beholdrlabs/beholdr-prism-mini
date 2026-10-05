@@ -7,7 +7,7 @@ import yaml
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
-import prism  # noqa: E402
+import prism
 
 FAST = [{"model": "fast-model", "via": "omp", "effort": "low"}]
 REASONING = [{"model": "deep-model", "via": "claude-code", "effort": "high"}]
@@ -57,7 +57,7 @@ def v2(monkeypatch):
 
 def test_no_config_exits_2(env, capsys):
     home, repo = env
-    code, out, err = run(["check"], home, repo, capsys)
+    code, _, err = run(["check"], home, repo, capsys)
     assert code == prism.EXIT_NO_CONFIG
     assert "init" in err
 

@@ -45,3 +45,7 @@ The config carries a `version`. When a skill release changes the format, `check`
 - [Dispatch recipes](references/dispatch.md) per harness.
 - [Choosing models](references/choosing-models.md): selection criteria, dated examples, and benchmark evidence.
 - [Earlier discussion](docs/skill-discussion.md) on why the mini skill and the experimental router are separate.
+
+## Development
+
+`uv sync` creates a `.venv` for editors (Zed's basedpyright and Ruff pick it up) and tests. Run `uv run pytest`. Runtime dependencies live in the inline metadata of `scripts/prism.py`; keep `pyproject.toml` in sync with it.
