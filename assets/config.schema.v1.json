@@ -11,11 +11,11 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "Schema location for editor validation; written by prism.py init."
+      "description": "Schema location for editor validation; written by prism.ts init."
     },
     "version": {
       "const": 1,
-      "description": "Config format version. prism.py migrate upgrades older files."
+      "description": "Config format version. prism.ts migrate upgrades older files."
     },
     "roles": {
       "type": "object",

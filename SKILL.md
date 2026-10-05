@@ -1,7 +1,7 @@
 ---
 name: beholdr-prism-mini
 description: Route subagent work by role using a project or user config (.beholdr/prism-mini.config.json). Fast models gather context (grep, codebase research, web fetches) and hand condensed briefs to reasoning models. Use when delegating, spawning subagents, choosing a worker model, or setting up model routing (init) across Claude Code, Codex, omp/OpenRouter, or Herdr.
-compatibility: Requires Python 3.11+ and uv for scripts/prism.py. Optional codex, omp, or herdr for cross-harness dispatch.
+compatibility: Requires Node.js 22.18+ or Bun for scripts/prism.ts (no packages to install). Optional codex, omp, or herdr for cross-harness dispatch.
 metadata:
   version: "2.0.0"
   config-schema: "1"
@@ -17,7 +17,9 @@ An explicit model instruction from the user or the project's instructions takes 
 
 From the project's working directory, run this skill's script (path relative to this skill's directory):
 
-    uv run --script <skill-dir>/scripts/prism.py check
+    node --disable-warning=ExperimentalWarning <skill-dir>/scripts/prism.ts check
+
+With Bun instead of Node: `bun <skill-dir>/scripts/prism.ts check`.
 
 | Exit | Meaning | Do |
 | --- | --- | --- |
@@ -28,7 +30,7 @@ From the project's working directory, run this skill's script (path relative to 
 | 4 | Older config version | Show `migrate` output, then run `migrate --write` with the user's approval. |
 | 5 | Config newer than skill | Tell the user to update the skill. Do not route until then. |
 
-If `uv` is missing or the script cannot run, say so and ask how to proceed. Do not fall back to model names you remember.
+If neither Node.js 22.18+ nor Bun is available, or the script cannot run, say so and ask how to proceed. Do not fall back to model names you remember.
 
 ## 2. Decide whether to delegate
 
@@ -58,7 +60,7 @@ If no candidate in a role can run, say which candidates were skipped and why, th
 
 ## 7. Set up or change the config
 
-1. Ask whether the config is for this project or for the user, then run `prism.py init --project` or `init --user`. Project settings replace the user's per role; delete a role's key from the project file to inherit it.
+1. Ask whether the config is for this project or for the user, then run `prism.ts init --project` or `init --user`. Project settings replace the user's per role; delete a role's key from the project file to inherit it.
 2. Find what can run: installed `claude`, `codex`, `omp`, `herdr`; their model lists (`omp models` includes OpenRouter); which provider key variables are set. Check presence only; never print or store key values.
 3. Propose two or three candidates per role using [choosing models](references/choosing-models.md).
 4. Show the JSON. Add paid or opt-in routes only with the user's approval.

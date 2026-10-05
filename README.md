@@ -6,15 +6,15 @@ Works in Claude Code, Codex, and omp, and can dispatch across them, including Op
 
 ## Setup
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Requires Node.js 22.18+ or Bun. The script has no dependencies, so there is nothing to install.
 
 Ask your agent to set up prism-mini routing, or run:
 
-    uv run --script scripts/prism.py init --project   # or --user
+    node scripts/prism.ts init --project   # or --user; `bun` works too
 
 Then fill in candidates (the agent can propose them) and validate:
 
-    uv run --script scripts/prism.py check
+    node scripts/prism.ts check
 
 ## Config
 
@@ -36,7 +36,7 @@ Candidates are tried in order. The schema is `assets/config.schema.v1.json`; `in
 
 ## Upgrading
 
-The config carries a `version`. When a skill release changes the format, `check` exits 4 and `prism.py migrate --write` upgrades the file, keeping a `.bak` copy.
+The config carries a `version`. When a skill release changes the format, `check` exits 4 and `prism.ts migrate --write` upgrades the file, keeping a `.bak` copy.
 
 ## More
 
@@ -46,4 +46,4 @@ The config carries a `version`. When a skill release changes the format, `check`
 
 ## Development
 
-`uv sync` creates a `.venv` for editors (Zed's basedpyright and Ruff pick it up) and tests. Run `uv run pytest`. Runtime dependencies live in the inline metadata of `scripts/prism.py`; keep `pyproject.toml` in sync with it.
+The skill runs `scripts/prism.ts` directly with Node's type stripping or Bun; `package.json` only adds dev tools. Run `bun install` (or `npm install`) once for editor types, then `npm test` or `bun test tests/` and `npm run typecheck`. `scripts/validate.ts` implements the JSON Schema keywords the config schema uses; a test fails if the schema starts using one it does not support.
