@@ -1,0 +1,19 @@
+# yaml-language-server: $schema={{SCHEMA_PATH}}
+# beholdr-prism-mini routing config. Candidates are tried in order; the first
+# one whose `via` can run here is used. See references/choosing-models.md in the skill.
+# Never put API keys or tokens in this file.
+version: 1
+
+roles:
+  # Gathering: grep, file reads, codebase research, web fetches.
+  # Prefer cheap, quick models with reliable tool calls.
+  fast: []
+  #  - model: <model id as the harness names it>
+  #    via: claude-code   # or codex, omp, herdr:<kind>
+  #    effort: low
+  # Code, designs, and decisions; consumes briefs from fast workers.
+  reasoning: []
+
+compression:
+  enabled: true
+  brief_max_words: 800

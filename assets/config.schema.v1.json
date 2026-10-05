@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "beholdr-prism-mini/config.schema.v1.json",
+  "title": "beholdr-prism-mini routing config, version 1",
+  "description": "One project or user config file. Never put API keys or tokens here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {"const": 1},
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fast": {"$ref": "#/$defs/candidates"},
+        "reasoning": {"$ref": "#/$defs/candidates"}
+      }
+    },
+    "compression": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "brief_max_words": {"type": "integer", "minimum": 100}
+      }
+    }
+  },
+  "$defs": {
+    "candidates": {
+      "description": "Candidates in preference order; the first runnable one is used.",
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/candidate"}
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "via"],
+      "properties": {
+        "model": {"type": "string", "minLength": 1, "description": "Model identifier as the via harness names it."},
+        "via": {"type": "string", "pattern": "^(claude-code|codex|omp|herdr:[a-z][a-z0-9-]*)$"},
+        "effort": {"enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"]},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}
