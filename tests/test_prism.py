@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
@@ -23,16 +22,16 @@ def env(tmp_path):
 
 def write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(data if isinstance(data, str) else yaml.safe_dump(data), encoding="utf-8")
+    path.write_text(data if isinstance(data, str) else json.dumps(data, indent=2), encoding="utf-8")
     return path
 
 
 def user_cfg(home):
-    return home / ".beholdr" / "prism-mini.config.yaml"
+    return home / ".beholdr" / "prism-mini.config.json"
 
 
 def project_cfg(repo):
-    return repo / ".beholdr" / "prism-mini.config.yaml"
+    return repo / ".beholdr" / "prism-mini.config.json"
 
 
 def run(argv, home, cwd, capsys):
@@ -65,7 +64,7 @@ def test_no_config_exits_2(env, capsys):
 def test_user_config_only(env, capsys):
     home, repo = env
     write(user_cfg(home), full())
-    code, out, _ = run(["check", "--json"], home, repo, capsys)
+    code, out, _ = run(["check"], home, repo, capsys)
     assert code == 0
     data = json.loads(out)
     assert data["roles"]["fast"] == FAST
@@ -78,7 +77,7 @@ def test_project_config_found_from_subdirectory(env, capsys):
     write(project_cfg(repo), full())
     deep = repo / "src" / "deep"
     deep.mkdir(parents=True)
-    code, out, _ = run(["check", "--json"], home, deep, capsys)
+    code, out, _ = run(["check"], home, deep, capsys)
     assert code == 0
     assert json.loads(out)["sources"] == {"project": str(project_cfg(repo))}
 
@@ -88,7 +87,7 @@ def test_project_role_replaces_user_role_and_inherits_others(env, capsys):
     write(user_cfg(home), full(compression={"brief_max_words": 500}))
     project_fast = [{"model": "project-fast", "via": "codex"}]
     write(project_cfg(repo), {"version": 1, "roles": {"fast": project_fast}, "compression": {"enabled": False}})
-    code, out, _ = run(["check", "--json"], home, repo, capsys)
+    code, out, _ = run(["check"], home, repo, capsys)
     assert code == 0
     data = json.loads(out)
     assert data["roles"] == {"fast": project_fast, "reasoning": REASONING}
@@ -99,7 +98,7 @@ def test_project_with_only_compression_inherits_roles(env, capsys):
     home, repo = env
     write(user_cfg(home), full())
     write(project_cfg(repo), {"version": 1, "compression": {"brief_max_words": 300}})
-    code, out, _ = run(["check", "--json"], home, repo, capsys)
+    code, out, _ = run(["check"], home, repo, capsys)
     assert code == 0
     assert json.loads(out)["roles"] == {"fast": FAST, "reasoning": REASONING}
 
@@ -107,7 +106,7 @@ def test_project_with_only_compression_inherits_roles(env, capsys):
 def test_home_cwd_does_not_double_count_user_config(env, capsys):
     home, _ = env
     write(user_cfg(home), full())
-    code, out, _ = run(["check", "--json"], home, home, capsys)
+    code, out, _ = run(["check"], home, home, capsys)
     assert code == 0
     assert json.loads(out)["sources"] == {"user": str(user_cfg(home))}
 
@@ -116,13 +115,13 @@ def test_non_git_directory_only_checks_cwd(env, capsys):
     home, _ = env
     outside = home / "notes" / "sub"
     outside.mkdir(parents=True)
-    write(home / "notes" / ".beholdr" / "prism-mini.config.yaml", full())
+    write(home / "notes" / ".beholdr" / "prism-mini.config.json", full())
     code, _, _ = run(["check"], home, outside, capsys)
     assert code == prism.EXIT_NO_CONFIG
 
 
-@pytest.mark.parametrize("text", ["", "version: [1\n", "- just\n- a list\n"])
-def test_unreadable_yaml_exits_3_with_path(env, capsys, text):
+@pytest.mark.parametrize("text", ["", '{"version": 1,', "[1, 2]"])
+def test_malformed_json_exits_3_with_path(env, capsys, text):
     home, repo = env
     path = write(project_cfg(repo), text)
     code, _, err = run(["check"], home, repo, capsys)
@@ -179,12 +178,12 @@ def test_older_config_exits_4(env, capsys, v2):
     assert "migrate --project --write" in err
 
 
-def test_text_output_is_yaml(env, capsys):
+def test_duplicate_keys_exit_3(env, capsys):
     home, repo = env
-    write(project_cfg(repo), full())
-    code, out, _ = run(["check"], home, repo, capsys)
-    assert code == 0
-    assert yaml.safe_load(out)["roles"]["reasoning"] == REASONING
+    write(project_cfg(repo), '{"version": 1, "version": 2}')
+    code, _, err = run(["check"], home, repo, capsys)
+    assert code == prism.EXIT_INVALID
+    assert "duplicate key 'version'" in err
 
 
 def test_usage_error_exits_1(env, capsys):
@@ -202,9 +201,9 @@ def test_init_project_writes_at_git_root_with_schema_path(env, capsys):
     assert code == 0
     target = project_cfg(repo)
     assert out.strip() == str(target)
-    header = target.read_text(encoding="utf-8").splitlines()[0]
-    schema = Path(header.removeprefix(prism.SCHEMA_HEADER))
-    assert schema.is_absolute() and schema.is_file()
+    uri = json.loads(target.read_text(encoding="utf-8"))["$schema"]
+    assert uri.startswith("file:///")
+    assert Path(uri.removeprefix("file://")).is_file()
 
 
 def test_fresh_scaffold_fails_check_until_filled(env, capsys):
@@ -221,10 +220,10 @@ def test_init_refuses_overwrite_without_force(env, capsys):
     code, _, err = run(["init"], home, repo, capsys)
     assert code == prism.EXIT_USAGE
     assert "--force" in err
-    assert yaml.safe_load(target.read_text(encoding="utf-8")) == full()
+    assert json.loads(target.read_text(encoding="utf-8")) == full()
     code, _, _ = run(["init", "--force"], home, repo, capsys)
     assert code == 0
-    assert yaml.safe_load(target.read_text(encoding="utf-8"))["roles"]["fast"] == []
+    assert json.loads(target.read_text(encoding="utf-8"))["roles"]["fast"] == []
 
 
 def test_init_user(env, capsys):
@@ -255,8 +254,9 @@ def test_migrate_dry_run_then_write(env, capsys, v2):
 
     code, out, _ = run(["migrate"], home, repo, capsys)
     assert code == 0
-    assert out.startswith(prism.SCHEMA_HEADER)
-    assert yaml.safe_load(out)["version"] == 2
+    migrated = json.loads(out)
+    assert next(iter(migrated)) == "$schema"
+    assert migrated["version"] == 2
     assert target.read_text(encoding="utf-8") == original
 
     code, out, _ = run(["migrate", "--write"], home, repo, capsys)
@@ -303,4 +303,4 @@ def test_init_project_outside_project_refuses_to_touch_user_file(env, capsys):
     code, _, err = run(["init", "--project", "--force"], home, home, capsys)
     assert code == prism.EXIT_USAGE
     assert "--user" in err
-    assert yaml.safe_load(user.read_text(encoding="utf-8")) == full()
+    assert json.loads(user.read_text(encoding="utf-8")) == full()

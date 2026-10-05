@@ -1,6 +1,6 @@
 ---
 name: beholdr-prism-mini
-description: Route subagent work by role using a project or user config (.beholdr/prism-mini.config.yaml). Fast models gather context (grep, codebase research, web fetches) and hand condensed briefs to reasoning models. Use when delegating, spawning subagents, choosing a worker model, or setting up model routing (init) across Claude Code, Codex, omp/OpenRouter, or Herdr.
+description: Route subagent work by role using a project or user config (.beholdr/prism-mini.config.json). Fast models gather context (grep, codebase research, web fetches) and hand condensed briefs to reasoning models. Use when delegating, spawning subagents, choosing a worker model, or setting up model routing (init) across Claude Code, Codex, omp/OpenRouter, or Herdr.
 compatibility: Requires Python 3.11+ and uv for scripts/prism.py. Optional codex, omp, or herdr for cross-harness dispatch.
 metadata:
   version: "2.0.0"
@@ -17,7 +17,7 @@ An explicit model instruction from the user or the project's instructions takes 
 
 From the project's working directory, run this skill's script (path relative to this skill's directory):
 
-    uv run --script <skill-dir>/scripts/prism.py check --json
+    uv run --script <skill-dir>/scripts/prism.py check
 
 | Exit | Meaning | Do |
 | --- | --- | --- |
@@ -61,5 +61,5 @@ If no candidate in a role can run, say which candidates were skipped and why, th
 1. Ask whether the config is for this project or for the user, then run `prism.py init --project` or `init --user`. Project settings replace the user's per role; delete a role's key from the project file to inherit it.
 2. Find what can run: installed `claude`, `codex`, `omp`, `herdr`; their model lists (`omp models` includes OpenRouter); which provider key variables are set. Check presence only; never print or store key values.
 3. Propose two or three candidates per role using [choosing models](references/choosing-models.md).
-4. Show the YAML. Add paid or opt-in routes only with the user's approval.
+4. Show the JSON. Add paid or opt-in routes only with the user's approval.
 5. Write the file and run `check` until it exits 0.

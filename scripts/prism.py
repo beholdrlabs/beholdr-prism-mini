@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6", "jsonschema>=4.18"]
+# dependencies = ["jsonschema>=4.18"]
 # ///
 """Scaffold, validate, and migrate beholdr-prism-mini routing configs."""
 
@@ -15,15 +15,13 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-import yaml
 from jsonschema import Draft202012Validator
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 ASSETS = SKILL_DIR / "assets"
 SUPPORTED_VERSION = 1
 ROLES = ("fast", "reasoning")
-CONFIG_RELPATH = Path(".beholdr") / "prism-mini.config.yaml"
-SCHEMA_HEADER = "# yaml-language-server: $schema="
+CONFIG_RELPATH = Path(".beholdr") / "prism-mini.config.json"
 DEFAULT_COMPRESSION = {"enabled": True, "brief_max_words": 800}
 
 EXIT_OK, EXIT_USAGE, EXIT_NO_CONFIG, EXIT_INVALID, EXIT_MIGRATE, EXIT_TOO_NEW = 0, 1, 2, 3, 4, 5
@@ -74,15 +72,24 @@ def project_config_path(cwd: Path, home: Path) -> Path | None:
     return None
 
 
+def _reject_duplicates(pairs: list[tuple[str, object]]) -> dict:
+    data = {}
+    for key, value in pairs:
+        if key in data:
+            raise ValueError(f"duplicate key {key!r}")
+        data[key] = value
+    return data
+
+
 def load_file(path: Path) -> dict:
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
-        raise ConfigError(EXIT_INVALID, f"{path}: not valid YAML: {exc}") from None
+        data = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicates)
     except (OSError, UnicodeDecodeError) as exc:
         raise ConfigError(EXIT_INVALID, f"{path}: cannot read: {exc}") from None
+    except ValueError as exc:  # json.JSONDecodeError and duplicate keys
+        raise ConfigError(EXIT_INVALID, f"{path}: not valid JSON: {exc}") from None
     if not isinstance(data, dict):
-        raise ConfigError(EXIT_INVALID, f"{path}: expected a mapping with a 'version' key")
+        raise ConfigError(EXIT_INVALID, f"{path}: expected a JSON object with a 'version' key")
     return data
 
 
@@ -173,9 +180,14 @@ def resolve(cwd: Path, home: Path) -> dict:
     return config
 
 
-def cmd_check(cwd: Path, home: Path, as_json: bool) -> int:
-    config = resolve(cwd, home)
-    print(json.dumps(config, indent=2) if as_json else yaml.safe_dump(config, sort_keys=False).rstrip())
+def _dump(schema_version: int, data: dict) -> str:
+    """Serialise a config file with its $schema pointing at the installed schema."""
+    body = {"$schema": schema_path(schema_version).as_uri(), **{k: v for k, v in data.items() if k != "$schema"}}
+    return json.dumps(body, indent=2) + "\n"
+
+
+def cmd_check(cwd: Path, home: Path) -> int:
+    print(json.dumps(resolve(cwd, home), indent=2))
     return EXIT_OK
 
 
@@ -185,9 +197,9 @@ def cmd_init(cwd: Path, home: Path, scope: str, force: bool) -> int:
         raise ConfigError(EXIT_USAGE, f"{cwd} is not inside a project; run from a project directory, or use --user")
     if target.exists() and not force:
         raise ConfigError(EXIT_USAGE, f"{target} already exists; edit it, or pass --force to replace it")
-    template = (ASSETS / "config.template.yaml").read_text(encoding="utf-8")
+    template = (ASSETS / "config.template.json").read_text(encoding="utf-8")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(template.replace("{{SCHEMA_PATH}}", str(schema_path(SUPPORTED_VERSION))), encoding="utf-8")
+    target.write_text(template.replace("{{SCHEMA_URI}}", schema_path(SUPPORTED_VERSION).as_uri()), encoding="utf-8")
     print(target)
     return EXIT_OK
 
@@ -203,7 +215,7 @@ def cmd_migrate(cwd: Path, home: Path, scope: str, write: bool) -> int:
         return EXIT_OK
     migrated = upgrade(data, path)
     validate(migrated, path)
-    text = f"{SCHEMA_HEADER}{schema_path(SUPPORTED_VERSION)}\n{yaml.safe_dump(migrated, sort_keys=False)}"
+    text = _dump(SUPPORTED_VERSION, migrated)
     if not write:
         print(text, end="")
         return EXIT_OK
@@ -224,8 +236,7 @@ class _Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="prism.py", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    check = sub.add_parser("check", help="validate and print the resolved config")
-    check.add_argument("--json", action="store_true", help="print JSON instead of YAML")
+    sub.add_parser("check", help="validate and print the resolved config as JSON")
     init = sub.add_parser("init", help="write a config scaffold")
     init.add_argument("--force", action="store_true", help="replace an existing file")
     migrate = sub.add_parser("migrate", help="upgrade a config to the supported version")
@@ -244,7 +255,7 @@ def main(argv: list[str] | None = None, *, cwd: Path | None = None, home: Path |
     args = build_parser().parse_args(argv)
     try:
         if args.command == "check":
-            return cmd_check(cwd, home, args.json)
+            return cmd_check(cwd, home)
         if args.command == "init":
             return cmd_init(cwd, home, args.scope, args.force)
         if args.command == "migrate":

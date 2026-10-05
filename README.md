@@ -18,23 +18,21 @@ Then fill in candidates (the agent can propose them) and validate:
 
 ## Config
 
-Project: `.beholdr/prism-mini.config.yaml` (found from any subdirectory up to the git root). User: `~/.beholdr/prism-mini.config.yaml`. A project role list replaces the user's list for that role; anything the project leaves out is inherited.
+Project: `.beholdr/prism-mini.config.json` (found from any subdirectory up to the git root). User: `~/.beholdr/prism-mini.config.json`. A project role list replaces the user's list for that role; anything the project leaves out is inherited.
 
-    version: 1
-    roles:
-      fast:
-        - model: <model id>
-          via: omp            # claude-code | codex | omp | herdr:<kind>
-          effort: low
-      reasoning:
-        - model: <model id>
-          via: claude-code
-          effort: high
-    compression:
-      enabled: true
-      brief_max_words: 800
+    {
+      "$schema": "file:///path/to/beholdr-prism-mini/assets/config.schema.v1.json",
+      "version": 1,
+      "roles": {
+        "fast": [{ "model": "<model id>", "via": "omp", "effort": "low" }],
+        "reasoning": [{ "model": "<model id>", "via": "claude-code", "effort": "high" }]
+      },
+      "compression": { "enabled": true, "brief_max_words": 800 }
+    }
 
-Candidates are tried in order. The schema is `assets/config.schema.v1.json`; `init` points your editor at it. Never put API keys in the config.
+`via` is `claude-code`, `codex`, `omp`, or `herdr:<kind>`.
+
+Candidates are tried in order. The schema is `assets/config.schema.v1.json`; `init` sets `$schema` so JSON-aware editors validate the file and show field descriptions on hover. Duplicate keys are rejected. Never put API keys in the config.
 
 ## Upgrading
 

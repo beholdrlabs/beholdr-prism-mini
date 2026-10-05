@@ -1,6 +1,6 @@
 # Choosing models for each role
 
-Use this when writing or revising a config during init. Nothing here is a default: the skill routes only to candidates listed in `.beholdr/prism-mini.config.yaml`. Examples below go stale; check current availability, pricing, and evidence before proposing them.
+Use this when writing or revising a config during init. Nothing here is a default: the skill routes only to candidates listed in `.beholdr/prism-mini.config.json`. Examples below go stale; check current availability, pricing, and evidence before proposing them.
 
 ## `fast`
 

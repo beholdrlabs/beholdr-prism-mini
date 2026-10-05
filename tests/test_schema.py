@@ -2,12 +2,11 @@ import json
 from pathlib import Path
 
 import pytest
-import yaml
 from jsonschema import Draft202012Validator
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((SKILL_DIR / "assets" / "config.schema.v1.json").read_text(encoding="utf-8"))
-TEMPLATE = (SKILL_DIR / "assets" / "config.template.yaml").read_text(encoding="utf-8")
+TEMPLATE = (SKILL_DIR / "assets" / "config.template.json").read_text(encoding="utf-8")
 
 FAST = [{"model": "fast-model", "via": "omp", "effort": "low"}]
 REASONING = [{"model": "deep-model", "via": "claude-code", "effort": "high", "notes": "primary"}]
@@ -57,9 +56,14 @@ def test_rejects_invalid(doc):
     assert errors(doc)
 
 
+def test_accepts_schema_key():
+    assert errors({"$schema": "file:///skill/assets/config.schema.v1.json", "version": 1}) == []
+
+
 def test_template_has_schema_placeholder_and_empty_roles():
-    assert TEMPLATE.splitlines()[0] == "# yaml-language-server: $schema={{SCHEMA_PATH}}"
-    data = yaml.safe_load(TEMPLATE)
+    data = json.loads(TEMPLATE)
+    assert next(iter(data)) == "$schema"
+    assert data.pop("$schema") == "{{SCHEMA_URI}}"
     assert data == {
         "version": 1,
         "roles": {"fast": [], "reasoning": []},

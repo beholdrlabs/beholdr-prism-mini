@@ -1,0 +1,12 @@
+{
+  "$schema": "{{SCHEMA_URI}}",
+  "version": 1,
+  "roles": {
+    "fast": [],
+    "reasoning": []
+  },
+  "compression": {
+    "enabled": true,
+    "brief_max_words": 800
+  }
+}

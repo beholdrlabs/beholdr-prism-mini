@@ -2,6 +2,8 @@
 
 Status: approved design, 2026-10-05. Supersedes the hard-coded model defaults in skill 1.x.
 
+Amendment (2026-10-05): the config is JSON (`.beholdr/prism-mini.config.json`) with a `$schema` key instead of YAML with a `yaml-language-server` header; PyYAML is dropped and `check` always prints JSON. YAML examples below are historical.
+
 ## Goal
 
 Keep `beholdr-prism-mini` a lightweight, instruction-first skill, but move every model choice out of the skill and into a versioned config file. The skill describes *how* to route subagent work; the config says *which* models fill each role. New models then require a config edit, not a skill release.
