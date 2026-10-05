@@ -1,37 +1,64 @@
 ---
 name: beholdr-prism-mini
-description: Choose a primary or worker model and reasoning effort using the user's Codex and Claude Code preferences and benchmark-informed task routing. Use for deciding whether to delegate, or selecting a worker model.
+description: Route subagent work by role using a project or user config (.beholdr/prism-mini.config.yaml). Fast models gather context (grep, codebase research, web fetches) and hand condensed briefs to reasoning models. Use when delegating, spawning subagents, choosing a worker model, or setting up model routing (init) across Claude Code, Codex, omp/OpenRouter, or Herdr.
+compatibility: Requires Python 3.11+ and uv for scripts/prism.py. Optional codex, omp, or herdr for cross-harness dispatch.
+metadata:
+  version: "2.0.0"
+  config-schema: "1"
 ---
 
 # Beholdr Prism Mini
 
-Use these defaults for a practical primary or worker choice. Follow an explicit model choice from the user or applicable project instructions first. Work within the active client; do not switch providers just because another model has a higher benchmark score. Sol below means `gpt-6.1-sol`; keep `gpt-6-sol` as a fallback for bounded work and `gpt-6-astra` for primary-agent and difficult work during rollout.
+Route subagent work to two roles: `fast` models gather context; `reasoning` models write code, make designs, and decide. Which models fill each role comes from a config file, never from this skill or from memory. The user chooses the primary model in their harness settings; this skill only decides which subagents to start, on which model, and how.
 
-## Choose the main driver
+An explicit model instruction from the user or the project's instructions takes priority over the config.
 
-For Codex brainstorming and primary-agent work, use `gpt-6.1-sol` at xhigh effort, including broad architecture, several workstreams, and difficult integration. The user prefers Sol 6.1 in the former Astra 6 role for now; revisit that choice when Astra 6.1 is released and available. In Claude Code, use Opus 5.5 at high effort for brainstorming and as the usual primary agent. Current orchestration benchmarks do not rank these exact model-and-effort combinations. The primary agent owns task breakdown, critical context, integration, and final review.
+## 1. Load the config first
 
-## Decide whether to delegate
+From the project's working directory, run this skill's script (path relative to this skill's directory):
 
-Follow an explicit request to delegate. Otherwise delegate only when the task can be bounded and the handoff plus review is worthwhile. Give the worker an objective, relevant constraints, enough task context, and completion criteria. Keep dependent steps with the primary agent when coordination would outweigh parallel work.
+    uv run --script <skill-dir>/scripts/prism.py check --json
 
-## Route by task and ability to check the result
-
-| Task | Codex default | Claude Code default |
+| Exit | Meaning | Do |
 | --- | --- | --- |
-| Short docs, mechanical edits, simple scans, or tiny refactors | `gpt-6-luna` at low or medium effort | Sonnet 5.5 at low or medium effort |
-| Small, isolated code change with a clear check and cheap repair | Try `gpt-6-luna` at max effort | Sonnet 5.5 at high effort |
-| Bounded coding or analysis with ambiguity or a weak check | `gpt-6.1-sol` at medium effort; high if tricky | Sonnet 5.5 at high effort |
-| Short, repeatable browser or desktop flow with a visible completion check | `gpt-6.1-sol` at medium effort | Sonnet 5.5 at high effort |
-| Multi-step computer use with visual ambiguity or state across apps | `gpt-6.1-sol` at xhigh effort | Opus 5.5 at medium effort |
-| Difficult cross-file implementation, deep investigation, architecture, graphics, or UI | `gpt-6.1-sol` at xhigh effort | Opus 5.5 at medium effort |
+| 0 | Resolved config on stdout | Route with it. |
+| 2 | No config | Offer to set one up (section 7). Until then, do not pick models for subagents; ask the user. |
+| 3 | Invalid config | Show the errors and offer to fix the file. |
+| 4 | Older config version | Show `migrate` output, then run `migrate --write` with the user's approval. |
+| 5 | Config newer than skill | Tell the user to update the skill. |
 
-Use more capable routing when a mistake would be costly to detect or repair. If a Luna attempt fails its check or reveals hidden complexity, move to Sol. If a bounded Sol task stalls or exposes broad design choices, use Sol at high or xhigh effort or return the decision to the primary agent. For the hardest Codex work, consider Sol at max effort when the extra depth is worth the time. If a checked Sol result remains inadequate after a different approach, consider `gpt-6-astra` at high effort as a fallback. Do not repeatedly retry the same model and effort without a new approach.
+If `uv` is missing or the script cannot run, say so and ask how to proceed. Do not fall back to model names you remember.
 
-For browser or desktop work, delegate only to a worker with access to the required computer tools. When turnaround time matters, judge expected task completion time and likely retries, not output tokens per second or model size alone.
+## 2. Decide whether to delegate
 
-These are heuristics, not predicted success rates. FrontierCode supports Sol 6.1 medium for bounded coding and Luna max as a cheap trial. Higher Sol effort did not improve that aggregate coding score; judge the checked result. Artificial Analysis reports the same Intelligence Index score for Sol 6.1 xhigh and Astra 6 high, supporting the user's temporary Sol preference for difficult work. That aggregate comparison does not establish equal reliability on every task. The older computer-use scores measure Sol 6; the Sol 6.1 browser defaults follow current OpenAI guidance and the user's preference. See [benchmark notes](references/benchmarks.md) when revising the defaults.
+Follow an explicit request to delegate. Otherwise delegate only when the task can be bounded and the handoff plus review is worthwhile. Keep dependent steps, architecture, integration, and final review with the primary agent. Continuing without a subagent is always an option.
 
-Claude Fable requires extra credits in the user's setup, so leave it out unless the user explicitly opts in. Use a supported effort if the client offers one; otherwise keep the model choice and let the client use its default effort. GPT-6.1 Sol does not support `none` or `minimal` effort.
+## 3. Compress input with fast workers
 
-Use the active client's native agent tools when available. If a selected Codex model is missing there and Codex CLI is available, use `codex exec --model <model> -c 'model_reasoning_effort="<effort>"'` with a self-contained task prompt. If `gpt-6.1-sol` is unavailable, use `gpt-6-sol` at the same supported effort for bounded work or `gpt-6-astra` at high effort for primary-agent and difficult work, when available, and state the fallback. If the selected model and named fallbacks are unavailable, choose the closest capable model in the same client and state the fallback. Preserve the task's existing authorization and tool constraints. Review the worker's result and account for repairs before calling the delegation successful.
+When `compression.enabled` is true and the task needs context the primary agent does not already have:
+
+1. Write a gather request: the question, scope (paths, symbols, URLs), and the brief format in [dispatch recipes](references/dispatch.md#brief-format-for-fast-workers).
+2. Send it to `fast` candidates. Split independent questions across parallel workers.
+3. Work from the briefs. If something is missing, send a narrower follow-up gather instead of reading everything yourself.
+
+Skip gathering when the handoff would cost more than doing it directly, such as one known file or a single grep.
+
+## 4. Delegate reasoning work
+
+Give a `reasoning` worker the objective, constraints, relevant briefs, and completion criteria. Review its result and account for any repairs before calling the delegation successful.
+
+## 5. Dispatch
+
+Use the first candidate in the role whose `via` can run here; recipes are in [dispatch recipes](references/dispatch.md). Use `herdr:<kind>` only when the candidate says so and `HERDR_ENV=1`. Preserve the task's authorization and tool constraints in every handoff.
+
+## 6. Fallback
+
+If no candidate in a role can run, say which candidates were skipped and why, then use the closest capable model available in the current harness and state the substitution. Never silently select a paid route the config does not list. Do not retry the same candidate and effort without a new approach.
+
+## 7. Set up or change the config
+
+1. Ask whether the config is for this project or for the user, then run `prism.py init --project` or `init --user`. Project settings replace the user's per role.
+2. Find what can run: installed `claude`, `codex`, `omp`, `herdr`; their model lists (`omp models` includes OpenRouter); which provider key variables are set. Check presence only; never print or store key values.
+3. Propose two or three candidates per role using [choosing models](references/choosing-models.md).
+4. Show the YAML. Add paid or opt-in routes only with the user's approval.
+5. Write the file and run `check` until it exits 0.

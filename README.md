@@ -1,25 +1,47 @@
 # Beholdr Prism Mini
 
-A small, instruction-only skill for choosing a primary or worker model and reasoning effort. It uses GPT-6.1 Sol xhigh as the Codex main driver, including work previously assigned to Astra 6, and Opus 5.5 high as the usual Claude Code main driver. It adjusts worker coding choices using published benchmark results. The primary agent keeps architecture decisions, integration, and final audit.
+A small skill for routing subagent work by role. Fast, cheap models gather context (grep, codebase research, web fetches) and hand condensed briefs to reasoning models, which do the code, design, and decisions and can ask for more gathering. Which models fill each role comes from a config file, so new models need a config edit, not a skill release.
 
-Use [the skill](SKILL.md) when choosing a main driver or a model for a bounded delegated task. It needs no benchmark API, local classifier, service, or model call. [Benchmark notes](references/benchmarks.md) record the evidence and its limits, including orchestration benchmarks; they only need review when updating the defaults. The separate `beholdr-prism` project holds the experimental router and broader evaluation work.
+Works in Claude Code, Codex, and omp, and can dispatch across them, including OpenRouter models through omp and agents in Herdr panes. The larger `beholdr-prism` project holds the experimental router, plugins, hooks, and evaluation work.
 
-The key adjustment is that model *and* effort matter. Luna at max effort is a reasonable first try for isolated code that is easy to verify and repair. GPT-6.1 Sol at medium effort is the default for bounded work with more ambiguity; try high when the task needs more depth. Medium scored highest among its measured FrontierCode efforts, so increasing effort is not a guaranteed improvement. Sol 6.1 at xhigh effort handles difficult work, with max available for exceptional depth and Astra 6 high as a fallback when checked Sol results remain inadequate. For Claude Code, Sonnet at high effort handles bounded coding and Opus at medium effort handles the harder reasoning and coding tasks. These are starting choices, not promises of equal performance on any particular task.
+## Setup
 
-For screen-driven work, the skill uses GPT-6.1 Sol medium or Sonnet for a short, checkable flow and Sol 6.1 xhigh or Opus for a longer, ambiguous one. It treats speed as time to a checked result, including tool use and retries. The [benchmark notes](references/benchmarks.md) distinguish the new model's coding and Intelligence Index results from the older GPT-6 Sol computer-use and timing results.
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
-Sol 6.1 temporarily fills both Sol and Astra 6 roles by the user's preference. Its xhigh Intelligence Index score matches Astra 6 high at a lower benchmark task cost. Revisit the policy when Astra 6.1 is released and available; verify its model identifier, supported efforts, and current evidence before selecting it.
+Ask your agent to set up prism-mini routing, or run:
 
-## Use
+    uv run --script scripts/prism.py init --project   # or --user
 
-Ask Codex to use `$beholdr-prism-mini` when choosing a main driver or worker. An explicit model instruction from you or the project takes priority. The skill considers whether delegation helps, checks model availability in the active client, and leaves final review with the primary agent.
+Then fill in candidates (the agent can propose them) and validate:
 
-The active Sol model is `gpt-6.1-sol`. If it is unavailable during rollout, the skill falls back to `gpt-6-sol` at the same supported effort for bounded work or `gpt-6-astra` high for primary-agent and difficult work, and reports that choice. GPT-6.1 Sol supports low through max effort; `none` and `minimal` are unsupported. See [OpenAI's model documentation](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and [Codex availability](https://learn.chatgpt.com/docs/models).
+    uv run --script scripts/prism.py check
 
-## Workflow documentation
+## Config
 
-- [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents) covers per-agent model and reasoning choices.
-- [Codex developer commands](https://learn.chatgpt.com/docs/developer-commands) covers `codex exec --model` for a CLI fallback.
-- [Claude Code model configuration](https://code.claude.com/docs/en/model-config) covers model availability and effort levels.
-- [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) covers model and effort choices for workers.
-- [Earlier discussion](docs/skill-discussion.md) records why the simple skill and experimental router live separately.
+Project: `.beholdr/prism-mini.config.yaml` (found from any subdirectory up to the git root). User: `~/.beholdr/prism-mini.config.yaml`. A project role list replaces the user's list for that role; anything the project leaves out is inherited.
+
+    version: 1
+    roles:
+      fast:
+        - model: <model id>
+          via: omp            # claude-code | codex | omp | herdr:<kind>
+          effort: low
+      reasoning:
+        - model: <model id>
+          via: claude-code
+          effort: high
+    compression:
+      enabled: true
+      brief_max_words: 800
+
+Candidates are tried in order. The schema is `assets/config.schema.v1.json`; `init` points your editor at it. Never put API keys in the config.
+
+## Upgrading
+
+The config carries a `version`. When a skill release changes the format, `check` exits 4 and `prism.py migrate --write` upgrades the file, keeping a `.bak` copy.
+
+## More
+
+- [Dispatch recipes](references/dispatch.md) per harness.
+- [Choosing models](references/choosing-models.md): selection criteria, dated examples, and benchmark evidence.
+- [Earlier discussion](docs/skill-discussion.md) on why the mini skill and the experimental router are separate.
