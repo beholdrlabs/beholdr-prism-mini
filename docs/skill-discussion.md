@@ -2,7 +2,7 @@
 
 Status: brainstorming record, 2026-09-29. A simple first version now exists at [SKILL.md](../SKILL.md). This document records the tradeoffs discussed before it was written; the advanced router remains in the separate `beholdr-prism` project.
 
-The active skill now uses GPT-6.1 Sol for both the Sol tier and the former Astra 6 defaults, pending a review when Astra 6.1 is released and available. See [benchmark notes](../references/benchmarks.md) for the release evidence and updated defaults; the discussion below remains a historical record.
+Skill 2.0 (2026-10-05) removed built-in model defaults: model choices now live in a versioned `.beholdr/prism-mini.config.yaml`, as this discussion recommended. See [model-choice notes](../references/choosing-models.md) for selection guidance and evidence; the discussion below remains a historical record.
 
 ## What a skill could accomplish
 
