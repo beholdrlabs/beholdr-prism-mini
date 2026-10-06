@@ -51,7 +51,7 @@ Pilot results: one run per cell; two runs of an unchanged setup differed by abou
 - **Count dollars, not tokens.** With prompt caching, cost follows new tokens in the primary's context and the number of primary turns. Delegation wins when it moves a long reading loop out of the primary.
 - **What didn't help:** an unlimited worker budget (+27% cost, no better answers) and a hook that compresses tool output (no saving; the primary read more).
 
-Details, cost breakdowns, and limitations: [docs/evaluation.md](docs/evaluation.md). The story behind it: [Cheap Readers, Expensive Briefs](https://cbakis.com/blog/cheap-readers-expensive-briefs).
+Details, cost breakdowns, and limitations: [docs/evaluation.md](docs/evaluation.md).
 
 ## Setup
 
