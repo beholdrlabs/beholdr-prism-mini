@@ -6,6 +6,10 @@ import { join } from "node:path";
 type Line = Record<string, any>;
 
 const root = process.argv[2] ?? join(import.meta.dirname, "results");
+// Pilot runs recorded the earlier group codes.
+const GROUPS: Record<string, string> = {
+  A: "control", C: "prism", CU: "prism-unlimited", H: "hook", XA: "codex-control", XC: "codex-prism",
+};
 
 for (const id of readdirSync(root).sort()) {
   const dir = join(root, id);
@@ -18,7 +22,7 @@ for (const id of readdirSync(root).sort()) {
     // Codex runs: usage comes from the session rollouts; the answer is already in answer.md.
     const usage = JSON.parse(readFileSync(codexUsage, "utf8"));
     console.log(JSON.stringify({
-      id, arm: meta.arm, task: meta.task, run: meta.run, exit: exit.exit, wall_seconds: exit.wall_seconds,
+      id, group: GROUPS[meta.arm] ?? meta.arm, task: meta.task, run: meta.run, exit: exit.exit, wall_seconds: exit.wall_seconds,
       cost_usd: usage.cost_usd, models: usage.models,
     }));
     continue;
@@ -62,7 +66,7 @@ for (const id of readdirSync(root).sort()) {
 
   console.log(JSON.stringify({
     id,
-    arm: meta.arm,
+    group: GROUPS[meta.arm] ?? meta.arm,
     task: meta.task,
     run: meta.run,
     exit: exit.exit,

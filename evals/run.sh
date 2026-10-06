@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# Run one evaluation cell: ./run.sh <arm> <task-id> <run-number>
-# Arms: A, H, C, CU (Claude Code, Opus primary); XA, XC (Codex, Sol primary).
+# Run one evaluation cell: ./run.sh <group> <task-id> <run-number>
+# Groups (Claude Code, Opus primary): control, prism, prism-unlimited, hook.
+# Groups (Codex, Sol primary): codex-control, codex-prism.
+# Pilot result folders use the earlier codes A, C, CU, H, XA, XC, still accepted.
 # Each run gets a fresh worktree of the subject repo at the pinned commit.
 # Defaults to beholdr-lore; override with REPO, PIN, and TASKS.
 set -euo pipefail
 
-ARM=${1:?arm: A, H, C, CU, XA, or XC}
+ARM=${1:?group: control, prism, prism-unlimited, hook, codex-control, or codex-prism}
+case "$ARM" in
+  A) ARM=control ;; C) ARM=prism ;; CU) ARM=prism-unlimited ;; H) ARM=hook ;;
+  XA) ARM=codex-control ;; XC) ARM=codex-prism ;;
+esac
 TASK=${2:?task id from the tasks file}
 RUN=${3:?run number}
 
@@ -19,19 +25,19 @@ WORK_ROOT=${WORK_ROOT:-/tmp/prism-eval}
 export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$WORK_ROOT/target}
 
 case "$ARM" in
-  A) ROUTING="Work directly; do not start subagents."; EXTRA=(--disallowedTools Agent) ;;
-  H) ROUTING="Work directly; do not start subagents."
+  control) ROUTING="Work directly; do not start subagents."; EXTRA=(--disallowedTools Agent) ;;
+  hook) ROUTING="Work directly; do not start subagents."
      HOOK="node --disable-warning=ExperimentalWarning $EVAL_DIR/experiments/compress-hook.ts"
      EXTRA=(--disallowedTools Agent --settings "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Read|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK\",\"timeout\":240}]}]}}") ;;
-  C|CU) if [ "$TASK" = Q1 ]; then
+  prism|prism-unlimited) if [ "$TASK" = Q1 ]; then
        ROUTING="Use the beholdr-prism-mini skill to route this work."
      else
        ROUTING="Use the beholdr-prism-mini skill to delegate the gathering to fast workers."
      fi
      EXTRA=() ;;
-  XA) ROUTING="Work directly; do not spawn subagents."; PRIMARY=gpt-6.1-sol ;;
-  XC) ROUTING="Use the beholdr-prism-mini skill to delegate the gathering to fast workers."; PRIMARY=gpt-6.1-sol ;;
-  *) echo "arm must be A, H (A plus the compression hook), C, CU (C with the uncapped worker budget), XA, or XC (Codex)" >&2; exit 1 ;;
+  codex-control) ROUTING="Work directly; do not spawn subagents."; PRIMARY=gpt-6.1-sol ;;
+  codex-prism) ROUTING="Use the beholdr-prism-mini skill to delegate the gathering to fast workers."; PRIMARY=gpt-6.1-sol ;;
+  *) echo "group must be control, prism, prism-unlimited, hook, codex-control, or codex-prism" >&2; exit 1 ;;
 esac
 
 # The prompt is the blockquote under "## <TASK>." in tasks.md.
@@ -53,14 +59,14 @@ WT="$WORK_ROOT/wt/$ID"
 mkdir -p "$OUT" "$WORK_ROOT/wt"
 
 git -C "$LORE_REPO" worktree add --quiet --detach "$WT" "$PIN"
-if [ "$ARM" = XC ]; then
+if [ "$ARM" = codex-prism ]; then
   mkdir -p "$WT/.beholdr"
   cp "$EVAL_DIR/prism-mini.codex.config.json" "$WT/.beholdr/prism-mini.config.json"
   (cd "$WT" && node --disable-warning=ExperimentalWarning "$EVAL_DIR/../scripts/prism.ts" agents --write > /dev/null)
 fi
-if [ "$ARM" = C ] || [ "$ARM" = CU ]; then
+if [ "$ARM" = prism ] || [ "$ARM" = prism-unlimited ]; then
   CONFIG=prism-mini.config.json
-  [ "$ARM" = CU ] && CONFIG=prism-mini.uncapped.config.json
+  [ "$ARM" = prism-unlimited ] && CONFIG=prism-mini.uncapped.config.json
   mkdir -p "$WT/.beholdr"
   cp "$EVAL_DIR/$CONFIG" "$WT/.beholdr/prism-mini.config.json"
 fi
@@ -79,9 +85,9 @@ export PRISM_HOOK_LOG="$OUT/hook.jsonl"
 START=$(date +%s)
 set +e
 case "$ARM" in
-  XA|XC)
+  codex-control|codex-prism)
     CODEX_ARGS=(--model "$PRIMARY" -c "model_reasoning_effort=\"$EFFORT\"" -c 'mcp_servers={}' -s read-only --json -o "$OUT/answer.md")
-    [ "$ARM" = XA ] && CODEX_ARGS+=(-c 'agents.enabled=false')
+    [ "$ARM" = codex-control ] && CODEX_ARGS+=(-c 'agents.enabled=false')
     (cd "$WT" && timeout 45m codex exec "${CODEX_ARGS[@]}" "$PROMPT" < /dev/null) > "$OUT/stream.jsonl" 2> "$OUT/stderr.txt"
     STATUS=$?
     ROOT=$(node -e 'for (const l of require("fs").readFileSync(process.argv[1], "utf8").split("\n")) { try { const j = JSON.parse(l); if (j.type === "thread.started") { console.log(j.thread_id); break } } catch {} }' "$OUT/stream.jsonl")

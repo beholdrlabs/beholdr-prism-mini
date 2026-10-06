@@ -24,11 +24,19 @@ compression hook did not help.
 | Grading | Fact lists written from the code before each task's first run ([lore](../evals/answer-key.md), [Payload](../evals/payload/answer-key.md)); answers graded by Claude, not blind, with distinctive claims checked against the code |
 | Cost | Claude Code: reported `total_cost_usd`. Codex: token counts from session rollouts priced at API list rates (Codex subscriptions bill quota instead) |
 
-Arms: **A** primary alone; **C** primary plus workers through the skill; **CU** C
-with an effectively unlimited worker budget; **H** primary plus a compression
-hook; **XA** and **XC** the Codex equivalents of A and C. Except on lore Q1, the
-C prompts ask the primary to delegate, so they measure delegation itself rather
-than the skill's decision to delegate.
+Each task ran in these groups:
+
+| Group | What it is |
+| --- | --- |
+| **control** | The primary model alone: no subagents, it reads everything itself |
+| **prism** | The same primary with prism-mini; cheaper workers read and return briefs |
+| **prism-unlimited** | prism with an effectively unlimited worker budget |
+| **hook** | control plus a hook that compresses large tool outputs with Haiku |
+| **codex-control**, **codex-prism** | control and prism in Codex |
+
+Except on lore Q1, the prism prompts ask the primary to delegate, so they
+measure delegation itself rather than the skill's decision to delegate. Each
+group gets the same task prompt; only a one-line routing instruction differs.
 
 Prices used (per million tokens): Opus 5.5 $4 input, $20 output, $0.20 cache
 read, $8 one-hour cache write; Haiku 4.5 $1 / $5; Sol 6.1 $2 input, $0.10
@@ -39,7 +47,7 @@ $0.10 input, $0.01 cached, $0.50 output.
 
 ### Repository size
 
-| Task | Repo | A | C | Change |
+| Task | Repo | control: Opus alone | prism: Opus + Haiku workers | Change |
 | --- | --- | ---: | ---: | :---: |
 | Q1: API routes and request checks (one file) | lore | $0.30 | $0.34 | +12% |
 | Q2: inventory scan locations (four files) | lore | $0.81 | $0.91 | +12% |
@@ -47,19 +55,19 @@ $0.10 input, $0.01 cached, $0.50 output.
 | P1: REST create, end to end (cross-package) | Payload | $1.80 | $0.93 | −48% |
 
 On Q1 the primary loaded the skill and declined to delegate, as the skill
-instructs for one known file, so the difference is the skill's overhead. Lore C
-figures are for skill 2.1.0; with 2.0.0, C cost more than A on every task
+instructs for one known file, so the difference is the skill's overhead. Lore
+prism figures are for skill 2.1.0; with 2.0.0, prism cost more than control on every task
 ($1.01 on Q2, $1.10 on Q4).
 
 ### Accuracy
 
-| Task | A | C | Notes |
+| Task | control | prism | Notes |
 | --- | --- | --- | --- |
-| Q2 (15 facts) | 14.5 | 14.5 | Both missed the built-in plugin rule |
-| Q4 (16 facts) | 16 | 15.5 | C stated Codex usage reads a file; it spawns `codex app-server` |
-| P1 (15 facts) | 15 | 15 | A also found two real bugs; C's answer was half as long |
+| Q2, four files (15 facts) | 14.5 | 14.5 | Both missed the built-in plugin rule |
+| Q4, whole repo (16 facts) | 16 | 15.5 | prism stated Codex usage reads a file; it spawns `codex app-server` |
+| P1, Payload (15 facts) | 15 | 15 | control also found two real bugs; the prism answer was half as long |
 
-Both Opus answers on P1 also claimed that a collection without `access.create`
+Both Opus answers on P1 (control and prism) also claimed that a collection without `access.create`
 lets any logged-in user create. Payload's sanitized defaults restrict it to the
 admin-user collection; both Sol answers said so. The fact list did not cover
 this.
@@ -68,10 +76,10 @@ this.
 
 | Opus, by token type | Output | Cache writes | Cache reads | Workers | Total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| lore Q2, A | $0.19 | $0.54 | $0.08 | | $0.81 |
-| lore Q2, C (2.0.0, delegated) | $0.19 | $0.60 | $0.06 | $0.16 | $1.01 |
-| Payload P1, A (45 tool calls) | $0.41 | $0.81 | $0.58 | | $1.80 |
-| Payload P1, C (14 tool calls) | $0.22 | $0.38 | $0.12 | $0.22 | $0.93 |
+| lore Q2, control | $0.19 | $0.54 | $0.08 | | $0.81 |
+| lore Q2, prism (skill 2.0.0) | $0.19 | $0.60 | $0.06 | $0.16 | $1.01 |
+| Payload P1, control (45 primary tool calls) | $0.41 | $0.81 | $0.58 | | $1.80 |
+| Payload P1, prism (14 primary tool calls) | $0.22 | $0.38 | $0.12 | $0.22 | $0.93 |
 
 On a small repo, cache writes dominate and delegation adds to them: the skill
 text, the briefs, and the primary's spot checks are all new tokens. On a large
@@ -80,7 +88,7 @@ moving that loop into a worker removes most of those reads and writes.
 
 ### Worker budget (Payload P1)
 
-| | C (budget 15) | CU (unlimited) |
+| | prism (budget 15) | prism-unlimited |
 | --- | ---: | ---: |
 | Worker tool calls | 15, 15, 22 | 48, 34, 42 |
 | Worker cost | $0.22 | $0.60 |
@@ -100,7 +108,7 @@ replacement was ignored for built-in tools (`Read`, `Bash`); only
 input in `PreToolUse`: large reads are redirected to a Haiku-compressed copy,
 and read-only shell commands are run through a compressor.
 
-| | A | H (hook) | C |
+| | control | hook | prism |
 | --- | ---: | ---: | ---: |
 | Cost | $1.80 | $1.82 | $0.93 |
 | Time | 219 s | 239 s | 171 s |
@@ -113,23 +121,23 @@ hook shrinks individual outputs; the cost is in the number of turns.
 
 ### Codex (Payload P1)
 
-| | XA: Sol | XC: Sol + Luna |
+| | codex-control: Sol alone | codex-prism: Sol + Luna workers |
 | --- | ---: | ---: |
 | Cost | $0.60 | $0.36 (−40%) |
 | Time | 382 s | 310 s |
 | Worker cost | | $0.045 (3 threads, 49 requests) |
 | Facts | 15 | 15 |
 
-XA also flagged the unconditional rollback that was one of A's two bugs.
+codex-control also flagged the unconditional rollback, one of the two bugs control found.
 
 ## Findings that changed the skill
 
 | Finding | Rule in skill 2.2.0 |
 | --- | --- |
 | Small tasks and already-read files lose money | Decline them even when asked; say why in one line |
-| Briefs drop the detail audits need; A found bugs C missed | No delegation for audits, reviews, or bug hunts |
+| Briefs drop the detail audits need; control found bugs prism missed | No delegation for audits, reviews, or bug hunts |
 | Primary re-read whole files after briefs (2.0.0) | Briefs quote cited lines; re-open only doubted claims, only their lines |
-| C guessed when a brief had a gap (Q4) | Fill gaps with a narrower follow-up, never a guess |
+| prism guessed when a brief had a gap (Q4) | Fill gaps with a narrower follow-up, never a guess |
 | Workers exceeded prose budgets (22-23 calls for 15) | Generated workers with `maxTurns` (Claude Code) |
 | Readers only need to read | Read-only Bash guard (Claude Code); `sandbox_mode = "read-only"` (Codex) |
 | Sol reported a worker result after a failed spawn | Report only what a worker returned |
@@ -140,7 +148,7 @@ XA also flagged the unconditional rollback that was one of A's two bugs.
 
 - **Single runs.** Two runs of an unchanged Claude Code setup cost $1.80 and $1.52; differences under about 15% may be noise. Codex variance was not measured.
 - **Few tasks.** Three lore tasks and one Payload task; read-only questions only.
-- **Not blind.** Claude wrote the fact lists and graded the answers knowing the arm.
+- **Not blind.** Claude wrote the fact lists and graded the answers knowing the group.
 - **Fact lists are incomplete.** The Payload list missed the default-access rule.
 - **Untested modes.** The researcher and editor modes have no measurements yet.
 - **Versions.** Claude Code 2.1.289 and Codex CLI 0.160; harness behaviour (hooks, agent files, caching) may change.

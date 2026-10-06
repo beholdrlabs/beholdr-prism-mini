@@ -2,7 +2,7 @@
 
 Subject: [payloadcms/payload](https://github.com/payloadcms/payload) at
 `8001944` (about 453k lines of TypeScript excluding tests, about 16× lore).
-One task, arms A and C, one run each. Routing lines as in [../tasks.md](../tasks.md).
+One task; groups control, prism, prism-unlimited, hook, codex-control, and codex-prism, one run each. Routing lines as in [../tasks.md](../tasks.md).
 
 ## P1. REST create, end to end (broad)
 

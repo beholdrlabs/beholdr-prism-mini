@@ -8,16 +8,20 @@ Tested in Claude Code and Codex. Recipes for omp (including OpenRouter models) a
 
 ## Does it pay off?
 
-Pilot results, one run per cell, primary working alone versus with cheaper readers through the skill:
+Each task ran twice from a fresh checkout with the same prompt: once as a **control** (the primary model alone, reading everything itself) and once with **prism-mini** (the same primary delegating reading to cheaper workers). Answers were graded against fact lists written from the code before the runs.
 
-| Task | Repo size | Claude Code: Opus alone → with Haiku | Codex: Sol alone → with Luna |
-| --- | ---: | --- | --- |
-| One file | 29k lines | $0.30 → $0.34 (+12%, declined to delegate) | |
-| Four files | 29k lines | $0.81 → $0.91 (+12%) | |
-| Whole repo | 29k lines | $0.97 → $0.76 (−22%) | |
-| Cross-package trace | 453k lines | $1.80 → $0.93 (−48%) | $0.60 → $0.36 (−40%) |
+| Task | Repo size | Harness and models | Control | With prism-mini | Cost | Facts found (control / prism) |
+| --- | ---: | --- | ---: | ---: | :---: | :---: |
+| One file | 29k lines | Claude Code: Opus, Haiku workers | $0.30 | $0.34 | +12%, declined to delegate | not graded |
+| Four files | 29k lines | Claude Code: Opus, Haiku workers | $0.81 | $0.91 | +12% | 14.5 / 14.5 of 15 |
+| Whole repo | 29k lines | Claude Code: Opus, Haiku workers | $0.97 | $0.76 | −22% | 16 / 15.5 of 16 |
+| Cross-package trace | 453k lines | Claude Code: Opus, Haiku workers | $1.80 | $0.93 | **−48%** | 15 / 15 |
+| Cross-package trace | 453k lines | Codex: Sol, Luna workers | $0.60 | $0.36 | **−40%** | 15 / 15 |
 
-- **Same facts, less depth.** Fact coverage matched, but on the large repo the primary working alone also found two real bugs; the delegated answers were shorter.
+Pilot results: one run per cell; two runs of an unchanged setup differed by about 15%.
+
+- **Small tasks cost more; large codebases save 40-50%.** The skill now declines small tasks instead of paying the handoff.
+- **Same facts, less depth.** On the large repo, the control run also found two real bugs; the delegated answers were shorter.
 - **Count dollars, not tokens.** With prompt caching, cost follows new tokens in the primary's context and the number of primary turns. Delegation wins when it moves a long reading loop out of the primary.
 - **What didn't help:** an unlimited worker budget (+27% cost, no better answers) and a hook that compresses tool output (no saving; the primary read more).
 

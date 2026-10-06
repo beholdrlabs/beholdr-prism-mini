@@ -1,12 +1,12 @@
 # Tasks
 
-Each run sends one task prompt followed by the arm's routing line.
+Each run sends one task prompt followed by the group's routing line.
 
-**Arm A routing line:** `Work directly; do not start subagents.`
+**control routing line:** `Work directly; do not start subagents.`
 
-**Arm C routing line:**
+**prism routing line:**
 
-- Q1 (narrow control, tests the skill's own judgment): `Use the beholdr-prism-mini skill to route this work.`
+- Q1 (narrow task; tests the skill's own decision to delegate): `Use the beholdr-prism-mini skill to route this work.`
 - Q2, Q3, Q4, T1 (explicit delegation): `Use the beholdr-prism-mini skill to delegate the gathering to fast workers.`
 
 All answers must cite `path:line` for each claim.
