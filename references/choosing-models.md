@@ -12,6 +12,12 @@ Fast workers gather: grep, file reads, codebase research, web fetches, and conde
 
 Reasoning depth matters less. A fast model that is weak on long agentic tasks can still be a good gatherer, because the reasoning model does the hard part.
 
+What the [evaluation](../docs/evaluation.md) adds:
+
+- **Brief accuracy beats price.** Workers were 13-23% of a delegated run's cost; the rest was the primary. A worker whose briefs the primary can trust, without re-opening files or guessing at gaps, saves more than a cheaper one.
+- **Context window matters for large repositories.** Claude Haiku 4.5 has 200k tokens; GPT-6 Luna has 1.05M (Codex 0.160 reported a 258k window).
+- **Same harness as the primary.** Each Codex worker started with about 19k tokens of harness prompt; crossing harnesses adds a CLI start and its own system prompt per worker.
+
 ## `reasoning`
 
 Reasoning workers write code, make designs and decisions, and consume briefs. Prefer:
@@ -30,17 +36,30 @@ For speed, compare successful end-to-end time on similar tasks when available. O
 
 Review a config when a model is added, a major benchmark revision appears, or delegated tasks repeatedly contradict a choice. Prefer a few recent, comparable results with date, harness, effort, and task type. Avoid changing a config for a single leaderboard movement.
 
-## Example candidates (checked 2026-10-05)
+## Measured pairings (2026-10-06)
 
-Illustrative only. Verify identifiers in the target harness (`omp models`, `codex`, `claude`) before writing them.
+From the [evaluation](../docs/evaluation.md), one run per cell, primary at medium effort:
+
+| Harness | Primary | Fast worker | Large-repo trace vs primary alone |
+| --- | --- | --- | --- |
+| Claude Code 2.1.289 | `claude-opus-5-5` | `claude-haiku-4-5` | $1.80 → $0.93, same facts, thinner answer |
+| Codex 0.160 | `gpt-6.1-sol` | `gpt-6-luna` (medium) | $0.60 → $0.36, same facts |
+
+Sol was about three times cheaper than Opus at list prices on the same task and about 1.7 times slower. Small tasks lost money with either pairing.
+
+List prices per million tokens (input / cached input / output): Opus 5.5 $4 / $0.20 / $20 (one-hour cache writes $8); Haiku 4.5 $1 / $0.10 / $5; Sol 6.1 $2 / $0.10 / $10 (cache writes $2.50; 2x input and 1.5x output above 272k input tokens); Luna $0.10 / $0.01 / $0.50 (cache writes $0.125). Sources: [Claude pricing](https://platform.claude.com/docs/en/about-claude/pricing), [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol), [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
+
+## Example candidates (checked 2026-10-05; Claude Code and Codex rows updated 2026-10-06)
+
+Illustrative only. Verify identifiers in the target harness (`omp models`, `codex`, `claude`) before writing them. The omp rows are unmeasured with this skill.
 
 | Role | Model | via | Effort | Why | Source |
 | --- | --- | --- | --- | --- | --- |
 | fast | `openrouter/deepseek/deepseek-v4.1-flash` | omp | default | Intelligence Index 39, 213 tokens/s, 1.05 s to first token, $0.27 per index task, Terminal-Bench 4.0 26.8% | [Artificial Analysis](https://artificialanalysis.ai/models/releases/comparisons/deepseek-v4-1-flash-vs-gemini-3-8-flash), [OpenRouter](https://openrouter.ai/collections/tool-calling-models) |
 | fast | `openrouter/google/gemini-3.8-flash` | omp | default | Index 41 and 239 tokens/s, but 13.45 s to first token and $1.24 per index task | [Artificial Analysis](https://artificialanalysis.ai/models/releases/comparisons/deepseek-v4-1-flash-vs-gemini-3-8-flash) |
 | fast | `openrouter/z-ai/glm-5.3-flash` | omp | default | Among the most-used tool-calling models on OpenRouter; FrontierCode max 31.8 at $1.15 per task | [OpenRouter](https://openrouter.ai/collections/tool-calling-models), [FrontierCode](https://cognition.com/data/frontiercode-leaderboard/data.json) |
-| fast | `gpt-6-luna` | codex | medium | Cheapest native Codex option: FrontierCode 35.5 at $0.05 per task; weak on long terminal tasks (9.6%), so keep it to gathering | [FrontierCode](https://cognition.com/data/frontiercode-leaderboard/data.json), [Vals](https://www.vals.ai/models/openai_gpt-6-luna) |
-| fast | `claude-haiku-4-5` | claude-code | default | Smallest native Claude Code model; no comparable current benchmark found | [Claude Code model config](https://code.claude.com/docs/en/model-config) |
+| fast | `gpt-6-luna` | codex | medium | Cheapest native Codex option: FrontierCode 35.5 at $0.05 per task, $0.10/$0.50 per million tokens, 1.05M context; weak on long terminal tasks (9.6%), so keep it to gathering. Measured as a reader under Sol (see above) | [FrontierCode](https://cognition.com/data/frontiercode-leaderboard/data.json), [Vals](https://www.vals.ai/models/openai_gpt-6-luna) |
+| fast | `claude-haiku-4-5` | claude-code | default | Smallest native Claude Code model, $1/$5 per million tokens, 200k context; no comparable current benchmark found. Measured as a reader under Opus (see above) | [Claude Code model config](https://code.claude.com/docs/en/model-config) |
 | reasoning | `claude-opus-5-5` | claude-code | medium | FrontierCode 54.6 at $0.80 per task; high (54.0) and max (54.4) cost more without scoring higher | [FrontierCode](https://cognition.com/data/frontiercode-leaderboard/data.json) |
 | reasoning | `claude-sonnet-5-5` | claude-code | high | FrontierCode 49.4 at $0.42; xhigh 52.1 at $1.59 | [FrontierCode](https://cognition.com/data/frontiercode-leaderboard/data.json) |
 | reasoning | `gpt-6.1-sol` | codex | medium | FrontierCode 50.2 at $0.36, its best measured effort; xhigh matches GPT-6 Astra high on the Intelligence Index at lower cost | [FrontierCode](https://cognition.com/data/frontiercode-leaderboard/data.json), [Artificial Analysis](https://artificialanalysis.ai/models/releases/gpt-6-1-sol) |

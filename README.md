@@ -21,20 +21,19 @@ Pilot results, one run per cell, primary working alone versus with cheaper reade
 - **Count dollars, not tokens.** With prompt caching, cost follows new tokens in the primary's context and the number of primary turns. Delegation wins when it moves a long reading loop out of the primary.
 - **What didn't help:** an unlimited worker budget (+27% cost, no better answers) and a hook that compresses tool output (no saving; the primary read more).
 
-Details, cost breakdowns, and limitations: [docs/evaluation.md](docs/evaluation.md).
+Details, cost breakdowns, and limitations: [docs/evaluation.md](docs/evaluation.md). The story behind it: [Cheap Readers, Expensive Briefs](https://cbakis.com/blog/cheap-readers-expensive-briefs).
 
 ## Setup
 
-Requires Node.js 22.18+ or Bun. The script has no dependencies, so there is nothing to install.
+Requires Node.js 22.18+ or Bun. The script has no dependencies. Install the skill for your agents with the [skills CLI](https://github.com/vercel-labs/skills):
 
-Ask your agent to set up prism-mini routing, or run:
+    bunx skills add beholdrlabs/beholdr-prism-mini
 
-    node scripts/prism.ts init --project   # or --user; `bun` works too
+Then ask your agent to set up prism-mini routing, or run the script yourself from your project (`<skill-dir>` is where the skill was installed, such as `~/.agents/skills/beholdr-prism-mini`; `bun` works instead of `node`):
 
-Then fill in candidates (the agent can propose them), validate, and generate the worker definitions:
-
-    node scripts/prism.ts check
-    node scripts/prism.ts agents --write   # or --user; prints them without --write
+    node <skill-dir>/scripts/prism.ts init --project   # or --user
+    node <skill-dir>/scripts/prism.ts check             # after filling in candidates
+    node <skill-dir>/scripts/prism.ts agents --write    # or --user; prints them without --write
 
 `agents` writes `prism-reader`, `prism-researcher`, and `prism-editor` for Claude Code (`.claude/agents/*.md`, with tool lists, `maxTurns`, and a read-only Bash guard) and `prism_reader`, `prism_researcher`, and `prism_editor` for Codex (`.codex/agents/*.toml`, with read-only or workspace-write sandboxes). The Claude Code guard is referenced by absolute path, so prefer `--user` over committing project agent files.
 
@@ -76,3 +75,7 @@ The config carries a `version`. When a skill release changes the format, `check`
 ## Development
 
 The skill runs `scripts/prism.ts` directly with Node's type stripping or Bun; `package.json` only adds dev tools. Run `bun install` (or `npm install`) once for editor types, then `npm test` or `bun test tests/` and `npm run typecheck`. `scripts/readonly-guard.ts` is the read-only Bash hook for Claude Code workers. `scripts/validate.ts` implements the JSON Schema keywords the config schema uses; a test fails if the schema starts using one it does not support.
+
+## License
+
+[MIT](LICENSE)

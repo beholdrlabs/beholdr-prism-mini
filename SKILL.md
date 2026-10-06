@@ -1,6 +1,7 @@
 ---
 name: beholdr-prism-mini
 description: Route subagent work by role and mode using a project or user config (.beholdr/prism-mini.config.json). Fast workers read large codebases, research the web, or apply mechanical edits, and hand short sourced briefs to the primary model. Use when delegating, spawning subagents, choosing a worker model, generating worker definitions, or setting up model routing (init) in Claude Code, Codex, omp/OpenRouter, or Herdr. Not for small tasks, audits, or reviews.
+license: MIT
 compatibility: Requires Node.js 22.18+ or Bun for scripts/prism.ts (no packages to install). Optional codex, omp, or herdr for cross-harness dispatch.
 metadata:
   version: "2.2.0"
