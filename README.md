@@ -2,9 +2,26 @@
 
 A small skill for routing subagent work by role and mode. Fast, cheap workers read large codebases, research the web, or apply mechanical edits, and hand short sourced briefs to the primary model, which keeps the design, decisions, and review. Which models fill each role comes from a config file, so new models need a config edit, not a skill release.
 
-It is deliberately conservative: delegation pays off on wide sweeps of large codebases and loses money on small tasks, so the skill declines those. The [evaluation](evals/README.md) measured both in Claude Code and Codex.
+It is deliberately conservative: delegation pays off on wide sweeps of large codebases and loses money on small tasks, so the skill declines those.
 
-Works in Claude Code, Codex, and omp, and can dispatch across them, including OpenRouter models through omp and agents in Herdr panes. The larger `beholdr-prism` project holds the experimental router, plugins, hooks, and evaluation work.
+Tested in Claude Code and Codex. Recipes for omp (including OpenRouter models) and Herdr panes are documented but untested. The larger `beholdr-prism` project holds the experimental router, plugins, and hooks.
+
+## Does it pay off?
+
+Pilot results, one run per cell, primary working alone versus with cheaper readers through the skill:
+
+| Task | Repo size | Claude Code: Opus alone → with Haiku | Codex: Sol alone → with Luna |
+| --- | ---: | --- | --- |
+| One file | 29k lines | $0.30 → $0.34 (+12%, declined to delegate) | |
+| Four files | 29k lines | $0.81 → $0.91 (+12%) | |
+| Whole repo | 29k lines | $0.97 → $0.76 (−22%) | |
+| Cross-package trace | 453k lines | $1.80 → $0.93 (−48%) | $0.60 → $0.36 (−40%) |
+
+- **Same facts, less depth.** Fact coverage matched, but on the large repo the primary working alone also found two real bugs; the delegated answers were shorter.
+- **Count dollars, not tokens.** With prompt caching, cost follows new tokens in the primary's context and the number of primary turns. Delegation wins when it moves a long reading loop out of the primary.
+- **What didn't help:** an unlimited worker budget (+27% cost, no better answers) and a hook that compresses tool output (no saving; the primary read more).
+
+Details, cost breakdowns, and limitations: [docs/evaluation.md](docs/evaluation.md).
 
 ## Setup
 
@@ -53,7 +70,7 @@ The config carries a `version`. When a skill release changes the format, `check`
 
 - [Dispatch recipes](references/dispatch.md) per harness.
 - [Choosing models](references/choosing-models.md): selection criteria, dated examples, and benchmark evidence.
-- [Evaluation](evals/README.md): tasks, answer keys, and harness for the Claude Code and Codex comparisons.
+- [Evaluation results](docs/evaluation.md) and [harness](evals/README.md): tasks, answer keys, and scripts for the Claude Code and Codex comparisons.
 - [Earlier discussion](docs/skill-discussion.md) on why the mini skill and the experimental router are separate.
 
 ## Development

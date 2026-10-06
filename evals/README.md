@@ -4,9 +4,8 @@ Does handing reading to a cheaper worker save money without losing accuracy?
 This compares a primary model working alone with the same primary using Prism
 Mini, in Claude Code and in Codex, on two repositories.
 
-**Status:** pilots only (one run per cell). The planned 30-run lore evaluation
-has not been run. Two runs of the same setup cost $1.80 and $1.52, so treat
-single-run differences under about 15% as noise.
+**Status:** pilots only (one run per cell); the planned 30-run lore evaluation
+has not been run. Results: [docs/evaluation.md](../docs/evaluation.md).
 
 ## Arms
 
@@ -38,28 +37,10 @@ costs come from the stream's `total_cost_usd`; hook costs from `hook.jsonl`;
 Codex costs from [codex-usage.ts](codex-usage.ts), which sums the run's
 session rollouts (subagents included) at API list prices.
 
-## Results so far
+## Results
 
-Answers were graded against the answer keys by Claude, not blind.
-
-| Task | A | C | CU | H | XA | XC |
-| --- | --- | --- | --- | --- | --- | --- |
-| lore Q1, one file | $0.30 | $0.34 (declined) | | | | |
-| lore Q2, four files | $0.81, 14.5/15 | $0.91, 14.5/15 | | | | |
-| lore Q4, whole repo | $0.97, 16/16 | $0.76, 15.5/16 | | | | |
-| Payload P1 | $1.80, 15/15 | $0.93, 15/15 | $1.18, 14.5/15 | $1.82 | $0.60, 15/15 | $0.36, 15/15 |
-
-Lore C figures are for skill 2.1.0; with 2.0.0, C cost more than A on every
-task. Payload times: A 219 s, C 171 s, CU 203 s, H 239 s, XA 382 s, XC 310 s.
-
-Findings:
-
-- Cache writes, not tokens, drive Claude Code cost: two-thirds of Opus's bill on lore Q2. Delegation pays when it removes many primary turns over a growing context, so savings grow with repository size.
-- Delegated answers are thinner. On Payload, A also found two real bugs; C found none.
-- A larger worker budget tripled worker cost without better answers.
-- `PostToolUse` `updatedToolOutput` was ignored for built-in tools in Claude Code 2.1.289. Rewriting input instead works, but compression rarely triggered and made the primary read more (H).
-- Codex: agent names allow only underscores, `model` in agent files is ignored (pass it at spawn), and `codex exec --ephemeral` breaks subagents. Sol once reported a worker result after a failed spawn.
-- The Payload key missed that collections default to admin-only create access; both Sol answers said so, both Opus answers did not.
+See [docs/evaluation.md](../docs/evaluation.md) for results, cost breakdowns,
+findings, and limitations.
 
 ## Pilot history
 
