@@ -1,18 +1,42 @@
 # Beholdr Prism Mini
 
-A small skill for routing subagent work by role and mode. Fast, cheap workers read large codebases, research the web, or apply mechanical edits, and hand short sourced briefs to the primary model, which keeps the design, decisions, and review. Which models fill each role comes from a config file, so new models need a config edit, not a skill release.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](SKILL.md)
+[![Agent Skill](https://img.shields.io/badge/Agent%20Skill-beholdr--prism--mini-7c3aed.svg)](SKILL.md)
 
-It is deliberately conservative: delegation pays off on wide sweeps of large codebases and loses money on small tasks, so the skill declines those.
+**Cheap workers read; your primary model decides.**
 
-Tested in Claude Code and Codex. Recipes for omp (including OpenRouter models) and Herdr panes are documented but untested. The larger `beholdr-prism` project holds the experimental router, plugins, and hooks.
+An Agent Skill that routes subagent work by role and mode. Fast, cheap workers read large codebases, research the web, or apply mechanical edits, and hand short sourced briefs to the primary model, which keeps the design, decisions, and review.
 
-## Does it pay off?
+## Try It
+
+```bash
+npx skills add beholdrlabs/beholdr-prism-mini
+```
+
+Then tell your assistant:
+
+> Set up prism-mini routing.
+
+Once the config has models, ask for a wide sweep:
+
+> Use prism-mini to trace how a request flows through this repo.
+
+## What Changes
+
+- **Reading moves out of the primary:** workers sweep files or the web and return short briefs with file and line or URL sources.
+- **Three modes:** a reader for codebases, a researcher for the web, and an editor for mechanical changes the primary has already decided.
+- **Models come from a config:** new models need a config edit, not a skill release.
+- **Small tasks stay with the primary:** delegation loses money on a few known files, audits, reviews, and design decisions, so the skill declines them and says why.
+
+Tested in Claude Code and Codex. Recipes for omp (including OpenRouter models) and Herdr panes are documented but untested. The larger `beholdr-prism` project will be the experimental model router and plugin.
+
+## Does It Pay Off?
 
 Each task ran twice from a fresh checkout with the same prompt: once as a **control** (the primary model alone, reading everything itself) and once with **prism-mini** (the same primary delegating reading to cheaper workers). Answers were graded against fact lists written from the code before the runs.
 
 | Task | Repo size | Harness and models | Control | With prism-mini | Cost | Facts found (control / prism) |
 | --- | ---: | --- | ---: | ---: | :---: | :---: |
-| One file | 29k lines | Claude Code: Opus, Haiku workers | $0.30 | $0.34 | +12%, declined to delegate | not graded |
 | Four files | 29k lines | Claude Code: Opus, Haiku workers | $0.81 | $0.91 | +12% | 14.5 / 14.5 of 15 |
 | Whole repo | 29k lines | Claude Code: Opus, Haiku workers | $0.97 | $0.76 | −22% | 16 / 15.5 of 16 |
 | Cross-package trace | 453k lines | Claude Code: Opus, Haiku workers | $1.80 | $0.93 | **−48%** | 15 / 15 |
@@ -29,9 +53,7 @@ Details, cost breakdowns, and limitations: [docs/evaluation.md](docs/evaluation.
 
 ## Setup
 
-Requires Node.js 22.18+ or Bun. The script has no dependencies. Install the skill for your agents with the [skills CLI](https://github.com/vercel-labs/skills):
-
-    bunx skills add beholdrlabs/beholdr-prism-mini
+Requires Node.js 22.18+ or Bun. The script has no dependencies. Install the skill with the [skills CLI](https://github.com/vercel-labs/skills) as shown in [Try It](#try-it) (`bunx` works instead of `npx`).
 
 Then ask your agent to set up prism-mini routing, or run the script yourself from your project (`<skill-dir>` is where the skill was installed, such as `~/.agents/skills/beholdr-prism-mini`; `bun` works instead of `node`):
 
@@ -75,6 +97,10 @@ The config carries a `version`. When a skill release changes the format, `check`
 - [Choosing models](references/choosing-models.md): selection criteria, dated examples, and benchmark evidence.
 - [Evaluation results](docs/evaluation.md) and [harness](evals/README.md): tasks, answer keys, and scripts for the Claude Code and Codex comparisons.
 - [Earlier discussion](docs/skill-discussion.md) on why the mini skill and the experimental router are separate.
+
+## Feedback
+
+Try it on one real task in a large codebase. [Open an issue](https://github.com/beholdrlabs/beholdr-prism-mini/issues) with **the harness and models you used, what it cost, and whether the briefs missed anything**. Keep private code and API keys out of public posts.
 
 ## Development
 
