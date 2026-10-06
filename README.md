@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](SKILL.md)
 [![Agent Skill](https://img.shields.io/badge/Agent%20Skill-beholdr--prism--mini-7c3aed.svg)](SKILL.md)
 
-**Cheap workers read; your primary model decides.**
+**Simple, configurable subagent routing.**
 
 An Agent Skill that routes subagent work by role and mode. Fast, cheap workers read large codebases, research the web, or apply mechanical edits, and hand short sourced briefs to the primary model, which keeps the design, decisions, and review.
 
