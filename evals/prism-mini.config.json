@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "roles": {
+    "fast": [
+      {
+        "model": "claude-haiku-4-5",
+        "via": "claude-code"
+      }
+    ],
+    "reasoning": [
+      {
+        "model": "claude-opus-5-5",
+        "via": "claude-code",
+        "effort": "medium"
+      }
+    ]
+  },
+  "compression": {
+    "enabled": true,
+    "brief_max_words": 800
+  }
+}

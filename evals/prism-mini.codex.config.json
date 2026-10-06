@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "roles": {
+    "fast": [
+      {
+        "model": "gpt-6-luna",
+        "via": "codex",
+        "effort": "medium"
+      }
+    ],
+    "reasoning": [
+      {
+        "model": "gpt-6.1-sol",
+        "via": "codex",
+        "effort": "medium"
+      }
+    ]
+  }
+}
