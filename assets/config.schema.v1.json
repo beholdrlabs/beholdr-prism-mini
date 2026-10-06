@@ -44,6 +44,38 @@
           "type": "integer",
           "minimum": 100,
           "description": "Word limit for each brief. Default 800."
+        },
+        "total_brief_max_words": {
+          "type": "integer",
+          "minimum": 100,
+          "description": "Word limit for all briefs in one gather, across workers. Default 2000."
+        },
+        "worker_max_tool_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Tool-call budget for each fast worker. Default 15."
+        },
+        "research": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Overrides for web and documentation research, which needs more steps and longer briefs with sources. Defaults: 2000, 5000, 30.",
+          "properties": {
+            "brief_max_words": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "Word limit for each research brief. Default 2000."
+            },
+            "total_brief_max_words": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "Word limit for all research briefs in one gather. Default 5000."
+            },
+            "worker_max_tool_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Tool-call budget for each research worker. Default 30."
+            }
+          }
         }
       },
       "description": "Input compression: fast workers return condensed briefs to reasoning workers."

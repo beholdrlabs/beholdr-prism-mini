@@ -1,0 +1,129 @@
+// Render native worker definitions for each harness from a resolved config.
+// Claude Code reads .claude/agents/*.md; Codex reads .codex/agents/*.toml.
+// The same three modes exist in both; enforcement differs by harness.
+
+import { join } from "node:path";
+
+type Config = Record<string, any>;
+type Candidate = { model: string; via: string; effort?: string };
+type Limits = { brief_max_words: number; total_brief_max_words: number; worker_max_tool_calls: number };
+
+export interface AgentFile {
+  path: string;
+  content: string;
+}
+
+interface Mode {
+  name: string;
+  description: string;
+  limits: (config: Config) => Limits;
+  task: string;
+  claudeTools: string;
+  readOnly: boolean;
+  isolation?: "worktree";
+}
+
+const BRIEF = `Return a brief in this format:
+- Answer: the direct finding in one or two sentences.
+- Evidence: one line per claim: path:line (or URL), then the quoted line.
+- Gaps: what you searched for and did not find, and open questions.
+No raw file dumps or full pages.`;
+
+const MODES: Mode[] = [
+  {
+    name: "reader",
+    description: "Read-only worker for wide codebase sweeps. Use through the beholdr-prism-mini skill when an answer spans many unread files; not for small scopes, audits, reviews, or bug hunts.",
+    limits: (config) => config.compression,
+    task: "Gather facts from the repository to answer the question you are given. Grep for structure first (definitions, routes, calls), then read only the line ranges that answer the question; do not read whole files over about 300 lines.",
+    claudeTools: "Read, Grep, Glob, Bash",
+    readOnly: true,
+  },
+  {
+    name: "researcher",
+    description: "Read-only worker for web and documentation research. Use through the beholdr-prism-mini skill when a question needs many searches or pages; returns sourced briefs.",
+    limits: (config) => ({ ...config.compression, ...config.compression.research }),
+    task: "Research the question you are given using web search and fetches. Prefer primary sources (official docs, changelogs, papers); record the date of each source; stop when two independent sources agree or the budget runs out.",
+    claudeTools: "WebSearch, WebFetch, Read, Grep",
+    readOnly: true,
+  },
+  {
+    name: "editor",
+    description: "Worker for self-contained, mechanical edits (renames, link fixes, repeated changes) after the primary has made one example change. Use through the beholdr-prism-mini skill; never for migrations, irreversible operations, or design changes.",
+    limits: (config) => config.compression,
+    task: "Apply the change you are given to exactly the files listed, following the example change. Run the verification command you are given. Do not change anything else.",
+    claudeTools: "Read, Grep, Glob, Edit, Write, Bash",
+    readOnly: false,
+    isolation: "worktree",
+  },
+];
+
+function instructions(mode: Mode, limits: Limits): string {
+  const brief = mode.readOnly
+    ? `${BRIEF}\nKeep the brief under ${limits.brief_max_words} words.`
+    : "Return: the files changed, the verification command and its result, and anything you could not apply.";
+  return [
+    mode.task,
+    `Budget: at most ${limits.worker_max_tool_calls} tool calls. If the budget runs out, return what you have and list the rest under Gaps.`,
+    "Never guess: report only what you read or ran.",
+    brief,
+  ].join("\n\n");
+}
+
+function first(config: Config, role: string, via: string): Candidate | undefined {
+  return (config.roles?.[role] as Candidate[] | undefined)?.find((candidate) => candidate.via === via);
+}
+
+function claudeAgent(mode: Mode, config: Config, skillDir: string): AgentFile {
+  const limits = mode.limits(config);
+  const candidate = first(config, "fast", "claude-code");
+  const lines = [
+    "---",
+    `name: prism-${mode.name}`,
+    `description: ${JSON.stringify(mode.description)}`,
+    `tools: ${mode.claudeTools}`,
+    ...(candidate ? [`model: ${candidate.model}`] : []),
+    ...(candidate?.effort ? [`effort: ${candidate.effort}`] : []),
+    `maxTurns: ${limits.worker_max_tool_calls}`,
+    "omitClaudeMd: true",
+    ...(mode.isolation ? [`isolation: ${mode.isolation}`] : []),
+    "experimental:",
+    "  cacheTtl: 5m",
+    ...(mode.readOnly && mode.claudeTools.includes("Bash") ? [
+      "hooks:",
+      "  PreToolUse:",
+      "    - matcher: Bash",
+      "      hooks:",
+      "        - type: command",
+      `          command: node --disable-warning=ExperimentalWarning ${join(skillDir, "scripts", "readonly-guard.ts")}`,
+    ] : []),
+    "---",
+    "",
+    instructions(mode, limits),
+    "",
+  ];
+  return { path: join(".claude", "agents", `prism-${mode.name}.md`), content: lines.join("\n") };
+}
+
+const toml = (value: string) => JSON.stringify(value);
+
+function codexAgent(mode: Mode, config: Config): AgentFile {
+  const limits = mode.limits(config);
+  const candidate = first(config, "fast", "codex");
+  const lines = [
+    "# Generated by beholdr-prism-mini (prism.ts agents). Codex 0.160 ignores `model` here;",
+    "# the skill passes the model and effort when it spawns this agent.",
+    `name = ${toml(`prism_${mode.name}`)}`,
+    `description = ${toml(mode.description)}`,
+    `developer_instructions = ${toml(instructions(mode, limits))}`,
+    ...(candidate ? [`model = ${toml(candidate.model)}`] : []),
+    ...(candidate?.effort ? [`model_reasoning_effort = ${toml(candidate.effort)}`] : []),
+    `sandbox_mode = ${toml(mode.readOnly ? "read-only" : "workspace-write")}`,
+    "",
+  ];
+  return { path: join(".codex", "agents", `prism_${mode.name}.toml`), content: lines.join("\n") };
+}
+
+/** Worker files for every harness, paths relative to the project or home directory. */
+export function renderAgents(config: Config, skillDir: string): AgentFile[] {
+  return MODES.flatMap((mode) => [claudeAgent(mode, config, skillDir), codexAgent(mode, config)]);
+}

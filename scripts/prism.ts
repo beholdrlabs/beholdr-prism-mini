@@ -6,16 +6,24 @@ import { copyFileSync, mkdirSync, readFileSync, realpathSync, statSync, writeFil
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { renderAgents } from "./agents.ts";
 import { validate, type JsonPath, type Schema, type SchemaError } from "./validate.ts";
 
 const SKILL_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ASSETS = join(SKILL_DIR, "assets");
 const ROLES = ["fast", "reasoning"] as const;
 const CONFIG_RELPATH = join(".beholdr", "prism-mini.config.json");
-const DEFAULT_COMPRESSION = { enabled: true, brief_max_words: 800 };
+const DEFAULT_COMPRESSION = {
+  enabled: true,
+  brief_max_words: 800,
+  total_brief_max_words: 2000,
+  worker_max_tool_calls: 15,
+  research: { brief_max_words: 2000, total_brief_max_words: 5000, worker_max_tool_calls: 30 },
+};
 const USAGE = `usage: prism.ts check
        prism.ts init [--project | --user] [--force]
-       prism.ts migrate [--project | --user] [--write]`;
+       prism.ts migrate [--project | --user] [--write]
+       prism.ts agents [--project | --user] [--write]`;
 
 export const EXIT = { OK: 0, USAGE: 1, NO_CONFIG: 2, INVALID: 3, MIGRATE: 4, TOO_NEW: 5 } as const;
 
@@ -184,7 +192,9 @@ function merge(layers: Config[]): Config {
   const compression: Record<string, unknown> = { ...DEFAULT_COMPRESSION };
   for (const layer of layers) {
     Object.assign(roles, layer.roles ?? {});
-    Object.assign(compression, layer.compression ?? {});
+    const { research, ...rest } = (layer.compression ?? {}) as Config;
+    Object.assign(compression, rest);
+    compression.research = { ...(compression.research as Config), ...((research as Config) ?? {}) };
   }
   const missing = ROLES.filter((role) => !(role in roles));
   if (missing.length > 0) {
@@ -278,12 +288,31 @@ function cmdMigrate(io: Io, scope: Scope, write: boolean): number {
   return EXIT.OK;
 }
 
+/** Generate harness worker files from the resolved config; print them unless --write. */
+function cmdAgents(io: Io, scope: Scope, write: boolean): number {
+  const config = resolveConfig(io.cwd, io.home);
+  const root = scope === "user" ? io.home : gitRoot(io.cwd);
+  if (root === null) throw new ConfigError(EXIT.USAGE, `${io.cwd} is not inside a project; run from a project directory, or use --user`);
+  for (const file of renderAgents(config, SKILL_DIR)) {
+    const target = join(root, file.path);
+    if (write) {
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, file.content);
+      io.out(`${target}\n`);
+    } else {
+      io.out(`# ${target}\n${file.content}\n`);
+    }
+  }
+  return EXIT.OK;
+}
+
 function parseArgs(argv: string[]): { command: string; scope: Scope; flags: Set<string> } {
   const [command, ...rest] = argv;
   const allowed: Record<string, string[]> = {
     check: [],
     init: ["--project", "--user", "--force"],
     migrate: ["--project", "--user", "--write"],
+    agents: ["--project", "--user", "--write"],
   };
   if (command === undefined || !(command in allowed)) {
     throw new ConfigError(EXIT.USAGE, command === undefined ? "missing command" : `unknown command "${command}"`);
@@ -301,6 +330,7 @@ export function main(argv: string[], io: Io): number {
     const { command, scope, flags } = parseArgs(argv);
     if (command === "init") return cmdInit(io, scope, flags.has("--force"));
     if (command === "migrate") return cmdMigrate(io, scope, flags.has("--write"));
+    if (command === "agents") return cmdAgents(io, scope, flags.has("--write"));
     io.out(`${JSON.stringify(resolveConfig(io.cwd, io.home), null, 2)}\n`);
     return EXIT.OK;
   } catch (error) {

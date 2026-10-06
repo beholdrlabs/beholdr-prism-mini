@@ -30,7 +30,7 @@ test("accepts full config", () => {
   const doc = {
     version: 1,
     roles: { fast: FAST, reasoning: REASONING },
-    compression: { enabled: true, brief_max_words: 800 },
+    compression: { enabled: true, brief_max_words: 800, total_brief_max_words: 2000, worker_max_tool_calls: 15 },
   };
   assert.deepEqual(errors(doc), []);
 });
@@ -60,6 +60,8 @@ const invalid: unknown[] = [
   { version: 1, compression: { brief_max_words: 50 } },
   { version: 1, compression: { brief_max_words: 500.5 } },
   { version: 1, compression: { enabled: "yes" } },
+  { version: 1, compression: { total_brief_max_words: 50 } },
+  { version: 1, compression: { worker_max_tool_calls: 0 } },
   [1, 2],
 ];
 for (const [i, doc] of invalid.entries()) {
@@ -81,6 +83,6 @@ test("template has schema placeholder and empty roles", () => {
   assert.deepEqual(data, {
     version: 1,
     roles: { fast: [], reasoning: [] },
-    compression: { enabled: true, brief_max_words: 800 },
+    compression: { enabled: true, brief_max_words: 800, total_brief_max_words: 2000, worker_max_tool_calls: 15 },
   });
 });

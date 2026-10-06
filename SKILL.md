@@ -1,67 +1,66 @@
 ---
 name: beholdr-prism-mini
-description: Route subagent work by role using a project or user config (.beholdr/prism-mini.config.json). Fast models gather context (grep, codebase research, web fetches) and hand condensed briefs to reasoning models. Use when delegating, spawning subagents, choosing a worker model, or setting up model routing (init) across Claude Code, Codex, omp/OpenRouter, or Herdr.
+description: Route subagent work by role and mode using a project or user config (.beholdr/prism-mini.config.json). Fast workers read large codebases, research the web, or apply mechanical edits, and hand short sourced briefs to the primary model. Use when delegating, spawning subagents, choosing a worker model, generating worker definitions, or setting up model routing (init) in Claude Code, Codex, omp/OpenRouter, or Herdr. Not for small tasks, audits, or reviews.
 compatibility: Requires Node.js 22.18+ or Bun for scripts/prism.ts (no packages to install). Optional codex, omp, or herdr for cross-harness dispatch.
 metadata:
-  version: "2.0.0"
+  version: "2.2.0"
   config-schema: "1"
 ---
 
 # Beholdr Prism Mini
 
-Route subagent work to two roles: `fast` models gather context; `reasoning` models write code, make designs, and decide. Which models fill each role comes from a config file, never from this skill or from memory. The user chooses the primary model in their harness settings; this skill only decides which subagents to start, on which model, and how.
+Route subagent work to two roles: `fast` workers read, research, or apply mechanical edits; `reasoning` models write code, design, and decide. Models come from the config, never from this skill or memory; an explicit model instruction from the user or project overrides the config.
 
-An explicit model instruction from the user or the project's instructions takes priority over the config.
+## 1. Load the config
 
-## 1. Load the config first
-
-From the project's working directory, run this skill's script (path relative to this skill's directory):
+Run on its own, from the project directory (no `echo $?` or other chained commands):
 
     node --disable-warning=ExperimentalWarning <skill-dir>/scripts/prism.ts check
 
-With Bun instead of Node: `bun <skill-dir>/scripts/prism.ts check`.
-
-| Exit | Meaning | Do |
-| --- | --- | --- |
-| 0 | Resolved config on stdout | Route with it. |
-| 2 | No config | Offer to set one up (section 7). Until then, do not pick models for subagents; ask the user. |
-| 1 | Usage error (bad arguments, file already exists, not inside a project) | Read the message and correct the command. |
-| 3 | Invalid or unreadable config | Show the errors and offer to fix the file. Do not route until `check` exits 0. |
-| 4 | Older config version | Show `migrate` output, then run `migrate --write` with the user's approval. |
-| 5 | Config newer than skill | Tell the user to update the skill. Do not route until then. |
-
-If neither Node.js 22.18+ nor Bun is available, or the script cannot run, say so and ask how to proceed. Do not fall back to model names you remember.
+(`bun <skill-dir>/scripts/prism.ts check` also works.) Exit 0: route with the JSON on stdout. 2: no config; offer setup (section 6) and do not pick models until then. 1: fix the command. 3: show the errors and offer to fix the file. 4: show `migrate`, then `migrate --write` with approval. 5: ask the user to update the skill. If the script cannot run, say so; do not fall back to remembered model names.
 
 ## 2. Decide whether to delegate
 
-Follow an explicit request to delegate. Otherwise delegate only when the task can be bounded and the handoff plus review is worthwhile. Keep dependent steps, architecture, integration, and final review with the primary agent. Continuing without a subagent is always an option.
+Delegation pays off when it moves a long reading loop out of the primary and the briefs are much smaller than the reading they replace: every token added to the primary's context is paid at its price, and every primary turn re-reads it.
 
-## 3. Compress input with fast workers
+Do not delegate, even when asked to use this skill: questions answered by a few known files, a single grep, files you have already read, audits, reviews, bug hunts, migrations, irreversible operations, or design decisions. Do the work directly and say in one line why. Keep integration and final review with the primary.
 
-When `compression.enabled` is true and the task needs context the primary agent does not already have:
+## 3. Choose a mode
 
-1. Write a gather request: the question, scope (paths, symbols, URLs), and the brief format in [dispatch recipes](references/dispatch.md#brief-format-for-fast-workers).
-2. Send it to `fast` candidates. Split independent questions across parallel workers.
-3. Work from the briefs. If something is missing, send a narrower follow-up gather instead of reading everything yourself.
+| Mode | Use for | Limits (`compression`) |
+| --- | --- | --- |
+| **reader** (read-only) | Sweeps of large or unfamiliar codebases: more than about five unread files or a few thousand lines | `brief_max_words`, `total_brief_max_words`, `worker_max_tool_calls` |
+| **researcher** (read-only) | Web or documentation research needing many searches or pages | `research.*` |
+| **editor** (writes) | Mechanical edits across many files, after you make one example change | `worker_max_tool_calls`; you review the diff |
 
-Skip gathering when the handoff would cost more than doing it directly, such as one known file or a single grep.
+1. Map with one cheap listing (`git ls-files`, `rg --files`) and give two or three workers disjoint scopes.
+2. Start every request with the same context block (workers then share a cached prefix), then the question, files or symbols, and the mode's limits. Readers grep for structure, then read only the line ranges they need.
+3. Send all requests at once so workers run in parallel.
+4. Work from the briefs. Re-open only claims you doubt, and only their cited lines. Fill gaps with a narrower follow-up, never a guess.
+5. Report only what a worker returned. If a spawn fails or returns nothing, say so and do the work yourself.
 
-## 4. Delegate reasoning work
+**Brief format:** **Answer** (one or two sentences); **Evidence** (one line per claim: `path:line` or URL, then the quoted line); **Gaps** (searched but not found, open questions). No raw dumps.
 
-Give a `reasoning` worker the objective, constraints, relevant briefs, and completion criteria. Review its result and account for any repairs before calling the delegation successful.
+For `reasoning` workers, hand over the objective, constraints, relevant briefs, and completion criteria, and review the result before accepting it.
 
-## 5. Dispatch
+## 4. Dispatch
 
-Use the first candidate in the role whose `via` can run here; recipes are in [dispatch recipes](references/dispatch.md). Use `herdr:<kind>` only when the candidate says so and `HERDR_ENV=1`. Preserve the task's authorization and tool constraints in every handoff.
+Use the first candidate in the role whose `via` can run here, and pass its model and effort when spawning.
 
-## 6. Fallback
+- **Claude Code:** Agent tool with `subagent_type` `prism-reader`, `prism-researcher`, or `prism-editor` (Explore for reading if they do not exist) and `model` set. Start parallel workers in one message, not in the background.
+- **Codex:** spawn `prism_reader`, `prism_researcher`, or `prism_editor` and state the model and reasoning effort in the request; Codex ignores `model` in agent files.
+- **Others:** [dispatch recipes](references/dispatch.md). Use `herdr:<kind>` only when the candidate says so and `HERDR_ENV=1`.
 
-If no candidate in a role can run, say which candidates were skipped and why, then use the closest capable model available in the current harness and state the substitution. Never silently select a paid route the config does not list. Do not retry the same candidate and effort without a new approach.
+Preserve the task's authorization and tool limits in every handoff.
 
-## 7. Set up or change the config
+## 5. Fallback
 
-1. Ask whether the config is for this project or for the user, then run `prism.ts init --project` or `init --user`. Project settings replace the user's per role; delete a role's key from the project file to inherit it.
-2. Find what can run: installed `claude`, `codex`, `omp`, `herdr`; their model lists (`omp models` includes OpenRouter); which provider key variables are set. Check presence only; never print or store key values.
-3. Propose two or three candidates per role using [choosing models](references/choosing-models.md).
-4. Show the JSON. Add paid or opt-in routes only with the user's approval.
-5. Write the file and run `check` until it exits 0.
+If no candidate can run, say which were skipped and why, use the closest capable model in this harness, and state the substitution. Never select a paid route the config does not list, and do not retry the same candidate without a new approach.
+
+## 6. Set up
+
+1. Ask whether the config is for this project or the user; run `prism.ts init --project` or `--user`. A project role replaces the user's; omit it to inherit.
+2. Check what can run: `claude`, `codex`, `omp`, `herdr`, their model lists, and which provider key variables are set (presence only; never print keys).
+3. Propose two or three candidates per role from [choosing models](references/choosing-models.md); add paid or opt-in routes only with approval.
+4. Write the file and run `check` until it exits 0.
+5. Run `prism.ts agents --write` (`--user` writes `~/.claude/agents` and `~/.codex/agents`) to generate the workers. They enforce what instructions cannot: Claude Code workers get tool lists, `maxTurns`, and a read-only Bash guard; Codex workers get a read-only or workspace-write sandbox.

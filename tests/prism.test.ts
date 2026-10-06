@@ -1,16 +1,24 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { EXIT, main, runtime, type Migration } from "../scripts/prism.ts";
 
 const FAST = [{ model: "fast-model", via: "omp", effort: "low" }];
 const REASONING = [{ model: "deep-model", via: "claude-code", effort: "high" }];
+const RESEARCH_DEFAULTS = { brief_max_words: 2000, total_brief_max_words: 5000, worker_max_tool_calls: 30 };
+
+const tempRoots: string[] = [];
+after(() => {
+  for (const root of tempRoots) rmSync(root, { recursive: true, force: true });
+});
 
 function env() {
-  const home = join(mkdtempSync(join(tmpdir(), "prism-")), "home");
+  const root = mkdtempSync(join(tmpdir(), "prism-"));
+  tempRoots.push(root);
+  const home = join(root, "home");
   const repo = join(home, "repo");
   mkdirSync(join(repo, ".git"), { recursive: true });
   return { home, repo };
@@ -68,7 +76,13 @@ test("user config only", () => {
   assert.equal(code, 0);
   const data = JSON.parse(out);
   assert.deepEqual(data.roles.fast, FAST);
-  assert.deepEqual(data.compression, { enabled: true, brief_max_words: 800 });
+  assert.deepEqual(data.compression, {
+    enabled: true,
+    brief_max_words: 800,
+    total_brief_max_words: 2000,
+    worker_max_tool_calls: 15,
+    research: RESEARCH_DEFAULTS,
+  });
   assert.deepEqual(data.sources, { user: userCfg(home) });
 });
 
@@ -100,7 +114,13 @@ test("project role replaces user role and inherits others", () => {
   assert.equal(code, 0);
   const data = JSON.parse(out);
   assert.deepEqual(data.roles, { fast: projectFast, reasoning: REASONING });
-  assert.deepEqual(data.compression, { enabled: false, brief_max_words: 500 });
+  assert.deepEqual(data.compression, {
+    enabled: false,
+    brief_max_words: 500,
+    total_brief_max_words: 2000,
+    worker_max_tool_calls: 15,
+    research: RESEARCH_DEFAULTS,
+  });
 });
 
 test("project with only compression inherits roles", () => {
@@ -325,4 +345,37 @@ test("migrate dry run then write", () => {
     assert.equal(readFileSync(`${target}.v1.bak`, "utf8"), original);
     assert.equal(run(["check"], home, repo).code, 0);
   });
+});
+
+test("agents renders Claude and Codex workers from the config", () => {
+  const { home, repo } = env();
+  write(projectCfg(repo), {
+    version: 1,
+    roles: {
+      fast: [{ model: "claude-haiku-4-5", via: "claude-code" }, { model: "gpt-6-luna", via: "codex", effort: "low" }],
+      reasoning: REASONING,
+    },
+  });
+  const { code, out } = run(["agents"], home, repo);
+  assert.equal(code, 0);
+  for (const mode of ["reader", "researcher", "editor"]) {
+    assert.match(out, new RegExp(`\\.claude/agents/prism-${mode}\\.md`));
+    assert.match(out, new RegExp(`\\.codex/agents/prism_${mode}\\.toml`));
+  }
+  assert.match(out, /model: claude-haiku-4-5/);
+  assert.match(out, /model = "gpt-6-luna"/);
+  assert.match(out, /sandbox_mode = "read-only"/);
+  assert.match(out, /sandbox_mode = "workspace-write"/);
+  assert.match(out, /isolation: worktree/);
+  assert.match(out, /readonly-guard\.ts/);
+  assert.match(out, /at most 30 tool calls/);
+  assert.ok(!existsSync(join(repo, ".claude")), "dry run must not write files");
+});
+
+test("agents --write creates the files", () => {
+  const { home, repo } = env();
+  write(projectCfg(repo), full());
+  assert.equal(run(["agents", "--write"], home, repo).code, 0);
+  assert.ok(existsSync(join(repo, ".claude", "agents", "prism-reader.md")));
+  assert.ok(existsSync(join(repo, ".codex", "agents", "prism_reader.toml")));
 });

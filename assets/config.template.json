@@ -7,6 +7,8 @@
   },
   "compression": {
     "enabled": true,
-    "brief_max_words": 800
+    "brief_max_words": 800,
+    "total_brief_max_words": 2000,
+    "worker_max_tool_calls": 15
   }
 }

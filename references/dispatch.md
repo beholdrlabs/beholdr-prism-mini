@@ -9,7 +9,7 @@ Use the first candidate in the role whose `via` can run in the current environme
 
 ## `codex`
 
-- **Inside Codex:** start a native subagent with the candidate's model and reasoning effort.
+- **Inside Codex:** spawn `prism_reader`, `prism_researcher`, or `prism_editor` (from `prism.ts agents --write`) and state the candidate's model and reasoning effort in the spawn request; Codex 0.160 ignores `model` in agent files. Agent names may contain only lowercase letters, digits, and underscores.
 - **From another harness:** `codex exec --model <model> -c 'model_reasoning_effort="<effort>"' "<prompt>"`.
 
 ## `omp`
@@ -32,10 +32,4 @@ If the agent reports `blocked`, show the user what it is asking; do not approve 
 
 ## Brief format for `fast` workers
 
-Ask gatherers to return, within `compression.brief_max_words`:
-
-- **Answer:** the direct finding in one or two sentences.
-- **Evidence:** `path:line` references or URLs, each with a short quote or one-line summary.
-- **Gaps:** what was searched but not found, and open questions.
-
-No raw file dumps or full web pages.
+Use the method, budget, and brief format in [SKILL.md section 3](../SKILL.md#3-compress-input-with-fast-workers), with the limits from `compression` in the resolved config.
